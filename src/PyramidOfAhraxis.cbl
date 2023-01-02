@@ -112,6 +112,24 @@ GAMELOOP.
 
 GOEAST.
        EVALUATE ROOMNUMBER
+           WHEN 2
+               MOVE 3 TO ROOMNUMBER
+           WHEN 6
+               MOVE 5 TO ROOMNUMBER
+           WHEN 9
+               MOVE 8 TO ROOMNUMBER
+           WHEN 10
+               MOVE 9 TO ROOMNUMBER
+           WHEN 11
+               MOVE 14 TO ROOMNUMBER
+           WHEN 12
+               MOVE 11 TO ROOMNUMBER
+           WHEN 13
+               MOVE 12 TO ROOMNUMBER
+           WHEN 14
+               MOVE 26 TO ROOMNUMBER
+           WHEN 15
+               MOVE 14 TO ROOMNUMBER
            WHEN 19
                MOVE 20 TO ROOMNUMBER
            WHEN 22
@@ -125,6 +143,18 @@ GONORTH.
        EVALUATE ROOMNUMBER
            WHEN 1
                MOVE 19 TO ROOMNUMBER
+           WHEN 3
+               MOVE 17 TO ROOMNUMBER
+           WHEN 4
+               MOVE 5 TO ROOMNUMBER
+           WHEN 6
+               MOVE 7 TO ROOMNUMBER
+           WHEN 11
+               MOVE 21 TO ROOMNUMBER
+           WHEN 14
+               MOVE 25 TO ROOMNUMBER
+           WHEN 15
+               MOVE 28 TO ROOMNUMBER
            WHEN 22
                MOVE 1 TO ROOMNUMBER
            WHEN OTHER
@@ -136,6 +166,18 @@ GOSOUTH.
        EVALUATE ROOMNUMBER
            WHEN 1
                MOVE 22 TO ROOMNUMBER
+           WHEN 2
+               MOVE 20 TO ROOMNUMBER
+           WHEN 5
+               MOVE 4 TO ROOMNUMBER
+           WHEN 6
+               MOVE 16 TO ROOMNUMBER
+           WHEN 7
+               MOVE 6 TO ROOMNUMBER
+           WHEN 8
+               MOVE 18 TO ROOMNUMBER
+           WHEN 14
+               MOVE 15 TO ROOMNUMBER
            WHEN 19
                MOVE 1 TO ROOMNUMBER
            WHEN OTHER
@@ -144,10 +186,28 @@ GOSOUTH.
        GO TO GAMELOOP.
 
 GOWEST.
-       IF ROOMNUMBER IS EQUAL TO 1 THEN 
-           GO TO LEAVEDUNGEON
-       END-IF
-       PERFORM INVALIDCOMMAND
+       EVALUATE ROOMNUMBER
+           WHEN 1
+               GO TO LEAVEDUNGEON
+           WHEN 3
+               MOVE 2 TO ROOMNUMBER
+           WHEN 4
+               MOVE 16 TO ROOMNUMBER
+           WHEN 5
+               MOVE 6 TO ROOMNUMBER
+           WHEN 8
+               MOVE 9 TO ROOMNUMBER
+           WHEN 9
+               MOVE 10 TO ROOMNUMBER
+           WHEN 11
+               MOVE 12 TO ROOMNUMBER
+           WHEN 12
+               MOVE 13 TO ROOMNUMBER
+           WHEN 14
+               MOVE 11 TO ROOMNUMBER
+           WHEN OTHER
+               PERFORM INVALIDCOMMAND
+       END-EVALUATE
        GO TO GAMELOOP.
 
 LEAVEDUNGEON.
