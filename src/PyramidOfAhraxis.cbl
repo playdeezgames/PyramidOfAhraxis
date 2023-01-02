@@ -130,10 +130,22 @@ GOEAST.
                MOVE 26 TO ROOMNUMBER
            WHEN 15
                MOVE 14 TO ROOMNUMBER
+           WHEN 16
+               MOVE 4 TO ROOMNUMBER
+           WHEN 17
+               MOVE 16 TO ROOMNUMBER
+           WHEN 18
+               MOVE 19 TO ROOMNUMBER
            WHEN 19
                MOVE 20 TO ROOMNUMBER
+           WHEN 21
+               MOVE 22 TO ROOMNUMBER
            WHEN 22
                MOVE 23 TO ROOMNUMBER
+           WHEN 24
+               MOVE 25 TO ROOMNUMBER
+           WHEN 27
+               MOVE 28 TO ROOMNUMBER
            WHEN OTHER
                PERFORM INVALIDCOMMAND
        END-EVALUATE
@@ -155,8 +167,18 @@ GONORTH.
                MOVE 25 TO ROOMNUMBER
            WHEN 15
                MOVE 28 TO ROOMNUMBER
+           WHEN 16
+               MOVE 6 TO ROOMNUMBER
+           WHEN 18
+               MOVE 8 TO ROOMNUMBER
+           WHEN 20
+               MOVE 2 TO ROOMNUMBER
            WHEN 22
                MOVE 1 TO ROOMNUMBER
+           WHEN 24
+               MOVE 23 TO ROOMNUMBER
+           WHEN 27
+               MOVE 26 TO ROOMNUMBER
            WHEN OTHER
                PERFORM INVALIDCOMMAND
        END-EVALUATE
@@ -178,8 +200,20 @@ GOSOUTH.
                MOVE 18 TO ROOMNUMBER
            WHEN 14
                MOVE 15 TO ROOMNUMBER
+           WHEN 17
+               MOVE 3 TO ROOMNUMBER
            WHEN 19
                MOVE 1 TO ROOMNUMBER
+           WHEN 21
+               MOVE 11 TO ROOMNUMBER
+           WHEN 23
+               MOVE 24 TO ROOMNUMBER
+           WHEN 25
+               MOVE 14 TO ROOMNUMBER
+           WHEN 26
+               MOVE 27 TO ROOMNUMBER
+           WHEN 28
+               MOVE 15 TO ROOMNUMBER
            WHEN OTHER
                PERFORM INVALIDCOMMAND
        END-EVALUATE
@@ -205,6 +239,22 @@ GOWEST.
                MOVE 13 TO ROOMNUMBER
            WHEN 14
                MOVE 11 TO ROOMNUMBER
+           WHEN 16
+               MOVE 17 TO ROOMNUMBER
+           WHEN 19
+               MOVE 18 TO ROOMNUMBER
+           WHEN 20
+               MOVE 19 TO ROOMNUMBER
+           WHEN 22
+               MOVE 21 TO ROOMNUMBER
+           WHEN 23
+               MOVE 22 TO ROOMNUMBER
+           WHEN 25
+               MOVE 24 TO ROOMNUMBER
+           WHEN 26
+               MOVE 14 TO ROOMNUMBER
+           WHEN 28
+               MOVE 27 TO ROOMNUMBER
            WHEN OTHER
                PERFORM INVALIDCOMMAND
        END-EVALUATE
