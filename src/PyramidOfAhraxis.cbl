@@ -4,6 +4,8 @@ PROGRAM-ID. PYRAMIDOFAHRAXIS.
 
 DATA DIVISION.
        WORKING-STORAGE SECTION.
+       01 GAMEDATA.
+          02 ROOMNUMBER PIC 99.
        01 SCRATCHPAD.
           02 COMMAND PIC X.
                        
@@ -17,19 +19,23 @@ TITLESCREEN.
        DISPLAY "*            A PRODUCTION OF THEGRUMPYGAMEDEV              *"
        DISPLAY "*            FOR INTERACTIVE FICTION GAME JAM              *"
        DISPLAY "*                                                          *"
-       DISPLAY "************************************************************"
+       DISPLAY "************************************************************".
+MAINMENU.
        DISPLAY SPACE
+       DISPLAY "MAIN MENU:"
        DISPLAY "[S]TART GAME"
        DISPLAY "[I]NSTRUCTIONS"
        DISPLAY "[Q]UIT"
        ACCEPT COMMAND
        EVALUATE COMMAND
         WHEN "s" WHEN "S"
+           GO TO STARTGAME
         WHEN "i" WHEN "I"
+           GO TO INSTRUCTIONS
         WHEN "q" WHEN "Q"
            GO TO CONFIRMQUIT
         WHEN OTHER 
-           GO TO TITLESCREEN
+           GO TO MAINMENU
        END-EVALUATE.
 
 CONFIRMQUIT.
@@ -41,4 +47,18 @@ CONFIRMQUIT.
        IF COMMAND="y" OR COMMAND="Y" THEN 
            STOP RUN
        END-IF
-       GO TO TITLESCREEN.
+       GO TO MAINMENU.
+
+INSTRUCTIONS.
+       DISPLAY SPACE 
+       DISPLAY "INSTRUCTIONS:"
+       DISPLAY SPACE 
+       DISPLAY "YOU ARE PRESENTED WITH A NUMBER OF SITUATIONS."
+       DISPLAY "YER CHOICES ARE CLEARLY MARKED WITH BRACKETS []."
+       DISPLAY "TYPE THE LETTER IN THE BRACKET AND PRESS ENTER"
+       DISPLAY "TO DO THE THING!"
+       GO TO MAINMENU.
+
+STARTGAME.
+       GO TO MAINMENU.
+       
