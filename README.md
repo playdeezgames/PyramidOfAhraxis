@@ -29,3 +29,8 @@ XY - Interactive Fiction Game Jam #ifgamejam
 * N = North
 * S = South
 * W = West
+
+## Inventory:
+
+* S = Shield
+* X = leave inventory
