@@ -22,6 +22,7 @@ XY - Interactive Fiction Game Jam #ifgamejam
 
 ## Commands:
 
+* C = Character
 * E = East
 * M = Menu
 * N = North
