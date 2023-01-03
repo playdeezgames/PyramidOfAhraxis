@@ -24,6 +24,7 @@ XY - Interactive Fiction Game Jam #ifgamejam
 
 * C = Character
 * E = East
+* I = Inventory
 * M = Menu
 * N = North
 * S = South
