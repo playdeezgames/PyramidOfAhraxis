@@ -1,1 +1,5 @@
-src/PyramidOfAhraxis
+old/PyramidOfAhraxis
+pub-linux/*
+pub-windows/*
+pub-mac/*
+pub-html/*
