@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pyramid of Ahraxis</title>
+<style>
+	html, body { margin: 0; height: 100%; background: #1a1c2c; overflow: hidden; }
+	body { display: flex; align-items: center; justify-content: center; }
+	canvas {
+		image-rendering: pixelated;
+		width: min(100vw, calc(100vh * 240 / 136));
+		height: min(100vh, calc(100vw * 136 / 240));
+		touch-action: none;
+	}
+</style>
+</head>
+<body>
+<canvas id="screen" width="240" height="136"></canvas>
+<script src="odin.js"></script>
+<script>
+(async function () {
+	const W = 240, H = 136;
+	const canvas = document.getElementById("screen");
+	const ctx = canvas.getContext("2d");
+	const memory = new odin.WasmMemoryInterface();
+	await odin.runWasm("game.wasm", null, {}, memory);
+	const ex = memory.exports;
+
+	// Placeholder audio: simple blips, one per game.Sound (id 1 = Bump). The cart's own sfx and
+	// music are not replayed yet. Each entry is a list of [hz, seconds].
+	const SOUNDS = [
+		[[110, 0.06]], [[880, 0.08]], [[330, 0.1]], [[294, 0.06], [440, 0.08]],
+		[[392, 0.12]], [[165, 0.15]], [[196, 0.15]],
+		[[196, 0.15], [165, 0.15], [131, 0.4]], [[392, 0.1], [523, 0.15]],
+		[[262, 0.1], [330, 0.1], [392, 0.1], [523, 0.2]], [[440, 0.1], [587, 0.15]],
+		[[784, 0.08], [988, 0.2]], [[523, 0.1], [659, 0.1], [784, 0.15]],
+		[[392, 0.1], [494, 0.1], [587, 0.2]], [[523, 0.12], [659, 0.12], [784, 0.12], [1047, 0.4]],
+	];
+	let audio = null;
+	try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+	function unlock() { if (audio && audio.state === "suspended") audio.resume(); }
+	function play(id) {
+		if (!audio) return;
+		let t = audio.currentTime;
+		for (const [hz, len] of SOUNDS[id - 1]) {
+			const osc = audio.createOscillator(), gain = audio.createGain();
+			osc.type = "square"; osc.frequency.value = hz; gain.gain.value = 0.06;
+			osc.connect(gain).connect(audio.destination);
+			osc.start(t); osc.stop(t + len);
+			t += len;
+		}
+	}
+	function command(c) {
+		ex.platform_command(c);
+		for (let id = ex.platform_take_sound(); id; id = ex.platform_take_sound()) play(id);
+	}
+
+	// game.Command order: Up Down Left Right Quaff Start Instructions Back Reset.
+	// TIC-80 cart: arrows move with keyp(code, 10, 10) (repeat after 10 frames, then every 10),
+	// Q quaffs, S starts, I opens help, any key leaves help, F2 resets. F4 (exit) is not offered.
+	const KEYS = { ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3, KeyQ: 4, KeyS: 5, KeyI: 6, F2: 8 };
+	const REPEATS = new Set([0, 1, 2, 3]);
+	let held = null; // { code, command, frames }
+	window.addEventListener("keydown", (e) => {
+		if (e.repeat) { e.preventDefault(); return; }
+		unlock();
+		const c = e.code in KEYS ? KEYS[e.code] : 7;
+		if (e.code in KEYS || e.code.startsWith("Key") || e.code === "Space" || e.code === "Enter") e.preventDefault();
+		command(c);
+		if (REPEATS.has(c)) held = { code: e.code, command: c, frames: 0 };
+	});
+	window.addEventListener("keyup", (e) => { if (held && held.code === e.code) held = null; });
+	window.addEventListener("blur", () => { held = null; });
+
+	// Touch: swipe to move, tap to start / go back.
+	let touch = null;
+	canvas.addEventListener("pointerdown", (e) => { unlock(); touch = { x: e.clientX, y: e.clientY }; });
+	canvas.addEventListener("pointerup", (e) => {
+		if (!touch) return;
+		const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
+		touch = null;
+		if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { command(5); command(7); return; }
+		command(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0));
+	});
+
+	const image = ctx.createImageData(W, H);
+	function frame() {
+		if (held && ++held.frames >= 10) { held.frames = 0; command(held.command); }
+		if (ex.platform_frame()) {
+			// Read the buffer after the call: wasm memory may have grown.
+			image.data.set(new Uint8Array(memory.memory.buffer, ex.platform_frame_ptr(), W * H * 4));
+			ctx.putImageData(image, 0, 0);
+		}
+		requestAnimationFrame(frame);
+	}
+	requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>

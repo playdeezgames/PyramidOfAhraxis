@@ -3,3 +3,4 @@ pub-linux/*
 pub-windows/*
 pub-mac/*
 pub-html/*
+build/
