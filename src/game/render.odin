@@ -7,9 +7,10 @@ SCREEN_W :: 240
 SCREEN_H :: 136
 
 TILE :: 12 // pixels per map cell
-VIEW :: 11 // cells across and down the play window, centred on the player
-VIEW_Y :: (SCREEN_H - VIEW * TILE) / 2
-HUD_X :: VIEW * TILE + 4
+VIEW_W :: 15 // cells across the play window, centred on the player
+VIEW_H :: 11 // cells down
+VIEW_Y :: (SCREEN_H - VIEW_H * TILE) / 2
+HUD_X :: VIEW_W * TILE + 4 // the statistics column is 56 px (nine glyphs) wide
 
 GLYPH_W :: 6
 GLYPH_H :: 8
@@ -39,6 +40,7 @@ Gfx :: enum {
 	Player,
 	Dead,
 	Heart,
+	Heart_Empty,
 }
 
 // Cart tile ids with behaviour (see game.odin); anything else is open floor.
@@ -86,8 +88,8 @@ draw_gfx :: proc(f: ^Frame, g: Gfx, x, y: int, opaque := false) {
 
 // The play window: cells off the map read as floor.
 draw_map :: proc(f: ^Frame, g: ^Game, cx, cy: int) {
-	for j in 0 ..< VIEW {
-		for i in 0 ..< VIEW {
+	for j in 0 ..< VIEW_H {
+		for i in 0 ..< VIEW_W {
 			x, y := i * TILE, VIEW_Y + j * TILE
 			for yy in 0 ..< TILE {
 				for xx in 0 ..< TILE {
@@ -161,7 +163,7 @@ draw_help :: proc(f: ^Frame) {
 	cls(f, COLOR_BG)
 	shadow(f, "Instructions", 0, 0, 9, 0, 2)
 	shadow(f, "Controls (in-game):", 0, 20, 3)
-	shadow(f, "Arrows: Move  F2: Reset  Q: Quaff", 0, 29)
+	shadow(f, "Arrows: Move  F2: Reset  P: Potion", 0, 29)
 	shadow(f, "Pictures:", 0, 42, 3)
 	rows := [?]struct {
 		g:    Gfx,
@@ -182,6 +184,21 @@ draw_help :: proc(f: ^Frame) {
 	shadow(f, "Press Any Key to go Back", 0, 126, 14)
 }
 
+// Floating messages: centred on their cell, rising one pixel every three frames, blinking out.
+draw_floaters :: proc(f: ^Frame, g: ^Game) {
+	cx, cy := g.x - VIEW_W / 2, g.y - VIEW_H / 2
+	for &m in g.floats {
+		if m.n == 0 || (m.age > FLOAT_LIFE - 18 && m.age / 3 % 2 == 0) {
+			continue
+		}
+		text := string(m.text[:m.n])
+		w := text_width(text)
+		x := clamp((m.x - cx) * TILE + TILE / 2 - w / 2, 0, VIEW_W * TILE - w)
+		y := VIEW_Y + (m.y - cy) * TILE + (TILE - GLYPH_H) / 2 - m.lift - m.age / 3
+		shadow(f, text, x, y, m.color)
+	}
+}
+
 // HUD row: a picture and a count, 14 px apart.
 hud_row :: proc(f: ^Frame, g: Gfx, n: int, row: int, color: u8 = 12) {
 	y := row * 14
@@ -192,9 +209,12 @@ hud_row :: proc(f: ^Frame, g: Gfx, n: int, row: int, color: u8 = 12) {
 
 draw_play :: proc(f: ^Frame, g: ^Game) {
 	cls(f, COLOR_BG)
-	draw_map(f, g, g.x - VIEW / 2, g.y - VIEW / 2)
-	draw_gfx(f, alive(g) ? .Player : .Dead, (VIEW / 2) * TILE, VIEW_Y + (VIEW / 2) * TILE)
-	hud_row(f, .Heart, g.h, 0)
+	draw_map(f, g, g.x - VIEW_W / 2, g.y - VIEW_H / 2)
+	draw_gfx(f, alive(g) ? .Player : .Dead, (VIEW_W / 2) * TILE, VIEW_Y + (VIEW_H / 2) * TILE)
+	draw_floaters(f, g)
+	for i in 0 ..< START_HEALTH {
+		draw_gfx(f, g.h > i ? .Heart : .Heart_Empty, HUD_X + i * TILE, 0)
+	}
 	hud_row(f, .Key, g.ks, 1)
 	hud_row(f, .Potion, g.ps, 2)
 	hud_row(f, .Jool, g.js, 3, 11)
@@ -203,9 +223,9 @@ draw_play :: proc(f: ^Frame, g: ^Game) {
 	if mget(g, g.x, g.y) == TRAP_SPRUNG {
 		print(f, "TRAP!", HUD_X, 86, 12)
 	}
-	shadow(f, "Arrows: Move", HUD_X, 104)
-	shadow(f, "F2: Reset", HUD_X, 112)
-	shadow(f, "Q: Quaff Potion", HUD_X, 120)
+	shadow(f, "Move:\x18\x19\x1B\x1A", HUD_X, 104)
+	shadow(f, "P:Potion", HUD_X, 112)
+	shadow(f, "F2:Reset", HUD_X, 120)
 }
 
 draw_score :: proc(f: ^Frame, g: ^Game) {

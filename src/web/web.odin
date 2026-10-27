@@ -51,6 +51,9 @@ platform_take_sound :: proc "c" () -> i32 {
 @(export)
 platform_frame :: proc "c" () -> i32 {
 	context = runtime.default_context()
+	if game.tick(&state.rules) {
+		state.dirty = true
+	}
 	if !state.dirty {
 		return 0
 	}

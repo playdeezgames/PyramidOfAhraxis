@@ -15,7 +15,7 @@ Walk the tomb one step at a time. Pick up **keys** to open doors, **potions** to
 
 Health is score too: the final tally counts your health, kills, jools, keys and spare potions.
 
-**Controls:** S starts and I shows the instructions on the title screen. Arrow keys move (hold to keep walking), Q quaffs a potion to restore your health to full, F2 resets the game. On a phone or tablet, swipe to move.
+**Controls:** S starts and I shows the instructions on the title screen. Arrow keys move (hold to keep walking), P drinks a potion to restore your health to full, F2 resets the game. On a phone or tablet, swipe to move.
 
 **Credits:** Urizen 1-bit tileset by vurmux, https://vurmux.itch.io/urizen-onebit-tileset (CC0). DINOBYTE bitmap font by mby, https://mby.itch.io/dinobyte, licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), used unmodified. Sounds made with the Anvil of SPLORR!!.
 

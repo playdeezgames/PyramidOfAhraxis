@@ -26,7 +26,8 @@ PICKS = [
     ('Monster',   104, 6, 3),    # devil
     ('Player',    104, 0, 12),   # plain white person
     ('Dead',      104, 10, 13),  # skeleton
-    ('Heart',      24, 17, 2),
+    ('Heart',      78, 37, 2),
+    ('Heart_Empty', 78, 37, 14),  # the same heart, darkened, for missing health
 ]
 
 def tile(col, row, color):

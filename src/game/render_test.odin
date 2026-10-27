@@ -76,3 +76,26 @@ resolve_uses_palette :: proc(t: ^testing.T) {
 	// Sweetie-16 colour 0 is 0x1a1c2c; bytes are R,G,B,A in memory.
 	testing.expect_value(t, f.rgba[0], u32(0xFF2C1C1A))
 }
+
+@(test)
+health_hearts :: proc(t: ^testing.T) {
+	f := new(Frame)
+	defer free(f)
+	g: Game
+	init_game(&g)
+	g.phase = .Play
+	g.h = 1
+	draw_game(f, &g)
+	// Heart pixels sit at the same place in every slot; slot 0 is lit, slot 1 is darkened.
+	lit, dark := -1, -1
+	for i in 0 ..< TILE * TILE {
+		if GFX[Gfx.Heart][i] != 0 {
+			x, y := i % TILE, i / TILE
+			lit = int(f.px[y * SCREEN_W + HUD_X + x])
+			dark = int(f.px[y * SCREEN_W + HUD_X + TILE + x])
+			break
+		}
+	}
+	testing.expect_value(t, lit, 2)
+	testing.expect_value(t, dark, 14)
+}

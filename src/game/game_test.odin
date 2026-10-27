@@ -202,3 +202,36 @@ map_edge_reads_empty :: proc(t: ^testing.T) {
 	command(&g, .Left)
 	testing.expect_value(t, g.x, -1) // off-map reads 0 so the cart walks off too
 }
+
+@(test)
+pickup_floats_a_message_that_expires :: proc(t: ^testing.T) {
+	g := fresh()
+	put_right(&g, TILE_KEY)
+	command(&g, .Right)
+	testing.expect_value(t, string(g.floats[0].text[:g.floats[0].n]), "+1 key")
+	testing.expect_value(t, g.floats[0].x, g.x)
+	for _ in 0 ..< FLOAT_LIFE - 1 {
+		testing.expect(t, tick(&g))
+	}
+	testing.expect(t, !tick(&g))
+	testing.expect_value(t, g.floats[0].n, 0)
+}
+
+@(test)
+messages_of_one_turn_stack :: proc(t: ^testing.T) {
+	g := fresh()
+	g.as = 1
+	put_right(&g, TILE_MONSTER)
+	command(&g, .Right) // the sword kills it, and the quirk lets it hit back
+	testing.expect_value(t, string(g.floats[0].text[:g.floats[0].n]), "Monster slain")
+	testing.expect_value(t, string(g.floats[1].text[:g.floats[1].n]), "Ouch! -1 health")
+	testing.expect_value(t, g.floats[1].lift, FLOAT_STACK)
+}
+
+@(test)
+locked_door_says_so :: proc(t: ^testing.T) {
+	g := fresh()
+	put_right(&g, 2)
+	command(&g, .Right)
+	testing.expect_value(t, string(g.floats[0].text[:g.floats[0].n]), "Need a key")
+}

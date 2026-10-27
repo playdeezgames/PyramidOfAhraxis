@@ -65,8 +65,8 @@
 
 	// game.Command order: Up Down Left Right Quaff Start Instructions Back Reset.
 	// TIC-80 cart: arrows move with keyp(code, 10, 10) (repeat after 10 frames, then every 10),
-	// Q quaffs, S starts, I opens help, any key leaves help, F2 resets. F4 (exit) is not offered.
-	const KEYS = { ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3, KeyQ: 4, KeyS: 5, KeyI: 6, F2: 8 };
+	// P quaffs a potion, S starts, I opens help, any key leaves help, F2 resets. F4 (exit) is not offered.
+	const KEYS = { ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3, KeyP: 4, KeyS: 5, KeyI: 6, F2: 8 };
 	const REPEATS = new Set([0, 1, 2, 3]);
 	let held = null; // { code, command, frames }
 	window.addEventListener("keydown", (e) => {

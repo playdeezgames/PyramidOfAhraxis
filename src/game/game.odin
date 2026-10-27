@@ -72,6 +72,58 @@ Game :: struct {
 	ms:     int, // kills
 	sounds: [8]Sound,
 	nsound: int,
+	floats: [8]Floater,
+}
+
+FLOAT_LIFE :: 80 // frames a floating message lives
+FLOAT_STACK :: 9 // pixels between messages made on the same turn
+
+// A short message that starts on the cell where something happened and drifts up.
+Floater :: struct {
+	text:  [16]u8,
+	n:     int, // 0 = unused
+	color: u8,
+	x, y:  int, // map cell
+	lift:  int, // extra pixels up, so messages of one turn do not overlap
+	age:   int, // frames
+}
+
+// Shows a message over the player.
+@(private)
+say :: proc(g: ^Game, text: string, color: u8 = 12) {
+	lift, free := 0, -1
+	for f, i in g.floats {
+		if f.n == 0 {
+			if free < 0 {
+				free = i
+			}
+		} else if f.age < 12 && f.x == g.x && f.y == g.y {
+			lift += FLOAT_STACK
+		}
+	}
+	if free < 0 {
+		return
+	}
+	f := &g.floats[free]
+	f^ = {x = g.x, y = g.y, lift = lift, color = color}
+	f.n = copy(f.text[:], text)
+}
+
+// One frame of drift; reports whether any message is still showing, so the page keeps redrawing.
+tick :: proc(g: ^Game) -> bool {
+	any_left := false
+	for &f in g.floats {
+		if f.n == 0 {
+			continue
+		}
+		f.age += 1
+		if f.age >= FLOAT_LIFE {
+			f = {}
+		} else {
+			any_left = true
+		}
+	}
+	return any_left
 }
 
 init_game :: proc(g: ^Game) {
@@ -134,28 +186,36 @@ move :: proc(g: ^Game, dx, dy: int) {
 	if fget(c, FLAG_SOLID) {
 		if fget(c, FLAG_DOOR) && g.ks > 0 {
 			play(g, .Door)
+			say(g, "Door unlocked", 4)
 			mset(g, nx, ny, 0)
 			g.ks -= 1
 		} else if c == TILE_MONSTER {
 			if g.as > 0 {
 				play(g, .Sword_Kill)
+				say(g, "Monster slain", 5)
 				g.as -= 1
 				g.ms += 1
 				mset(g, nx, ny, 0)
 			}
 			if g.ds > 0 {
 				play(g, .Shield_Block)
+				say(g, "Shield blocks", 9)
 				g.ds -= 1
 			} else {
 				g.h -= 1
 				if g.h <= 0 {
 					play(g, .Music_Death)
+					say(g, "You died!", 3)
 				} else {
 					play(g, .Monster_Hit)
+					say(g, "Ouch! -1 health", 3)
 				}
 			}
 		} else {
 			play(g, .Bump)
+			if fget(c, FLAG_DOOR) {
+				say(g, "Need a key", 12)
+			}
 		}
 		return
 	}
@@ -166,22 +226,27 @@ move :: proc(g: ^Game, dx, dy: int) {
 		g.phase = .Score
 	case TILE_KEY:
 		play(g, .Key)
+		say(g, "+1 key", 4)
 		mset(g, nx, ny, 0)
 		g.ks += 1
 	case TILE_POTION:
 		play(g, .Music_Potion)
+		say(g, "+1 potion", 2)
 		mset(g, nx, ny, 0)
 		g.ps += 1
 	case TILE_JOOL:
 		play(g, .Music_Jool)
+		say(g, "+1 jool", 11)
 		mset(g, nx, ny, 0)
 		g.js += 1
 	case TILE_SHIELD:
 		play(g, .Music_Shield)
+		say(g, "+1 shield", 9)
 		mset(g, nx, ny, 0)
 		g.ds += 1
 	case TILE_SWORD:
 		play(g, .Music_Sword)
+		say(g, "+1 sword", 12)
 		mset(g, nx, ny, 0)
 		g.as += 1
 	case TILE_TRAP:
@@ -189,8 +254,10 @@ move :: proc(g: ^Game, dx, dy: int) {
 		g.h -= 1
 		if g.h <= 0 {
 			play(g, .Music_Death)
+			say(g, "You died!", 3)
 		} else {
 			play(g, .Trap)
+			say(g, "Trap! -1 health", 3)
 		}
 	}
 }
@@ -200,6 +267,7 @@ move :: proc(g: ^Game, dx, dy: int) {
 quaff :: proc(g: ^Game) {
 	if g.ps > 0 {
 		play(g, .Music_Quaff)
+		say(g, "Health restored", 5)
 		g.ps -= 1
 		g.h = START_HEALTH
 	}
