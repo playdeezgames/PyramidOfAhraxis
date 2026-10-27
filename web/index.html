@@ -27,29 +27,36 @@
 	await odin.runWasm("game.wasm", null, {}, memory);
 	const ex = memory.exports;
 
-	// Placeholder audio: simple blips, one per game.Sound (id 1 = Bump). The cart's own sfx and
-	// music are not replayed yet. Each entry is a list of [hz, seconds].
-	const SOUNDS = [
-		[[110, 0.06]], [[880, 0.08]], [[330, 0.1]], [[294, 0.06], [440, 0.08]],
-		[[392, 0.12]], [[165, 0.15]], [[196, 0.15]],
-		[[196, 0.15], [165, 0.15], [131, 0.4]], [[392, 0.1], [523, 0.15]],
-		[[262, 0.1], [330, 0.1], [392, 0.1], [523, 0.2]], [[440, 0.1], [587, 0.15]],
-		[[784, 0.08], [988, 0.2]], [[523, 0.1], [659, 0.1], [784, 0.15]],
-		[[392, 0.1], [494, 0.1], [587, 0.2]], [[523, 0.12], [659, 0.12], [784, 0.12], [1047, 0.4]],
+	// Sound effects and stingers from the Anvil (assets/pyramid.world.json), in game.Sound order
+	// (id 1 is the first file). The context is made now and decodes straight away; browsers keep
+	// it suspended until the first key or tap.
+	const SOUND_FILES = [
+		"bump", "key", "door", "sword_kill", "shield_block", "monster_hit", "trap",
+		"music_death", "music_shield", "music_start", "music_sword", "music_jool", "music_potion",
+		"music_quaff", "music_exit",
 	];
+	const SOUND_GAIN = [0.12, 0.2, 0.15, 0.2, 0.2, 0.2, 0.2, 0.25, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.25];
 	let audio = null;
-	try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+	const buffers = [];
+	try {
+		audio = new (window.AudioContext || window.webkitAudioContext)();
+		SOUND_FILES.forEach((name, i) => {
+			fetch("sfx/" + name + ".wav")
+				.then((r) => r.arrayBuffer())
+				.then((data) => audio.decodeAudioData(data))
+				.then((buffer) => { buffers[i] = buffer; })
+				.catch(() => {});
+		});
+	} catch (e) { audio = null; }
 	function unlock() { if (audio && audio.state === "suspended") audio.resume(); }
 	function play(id) {
-		if (!audio) return;
-		let t = audio.currentTime;
-		for (const [hz, len] of SOUNDS[id - 1]) {
-			const osc = audio.createOscillator(), gain = audio.createGain();
-			osc.type = "square"; osc.frequency.value = hz; gain.gain.value = 0.06;
-			osc.connect(gain).connect(audio.destination);
-			osc.start(t); osc.stop(t + len);
-			t += len;
-		}
+		const buffer = buffers[id - 1];
+		if (!audio || !buffer) return;
+		const source = audio.createBufferSource(), gain = audio.createGain();
+		source.buffer = buffer;
+		gain.gain.value = SOUND_GAIN[id - 1];
+		source.connect(gain).connect(audio.destination);
+		source.start();
 	}
 	function command(c) {
 		ex.platform_command(c);

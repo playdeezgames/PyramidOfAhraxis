@@ -26,5 +26,5 @@ Health is score too: the final tally counts your health, kills, jools, keys and 
 - **Do not ship before October 29, 2026** (avoid spamming itch feeds). `git push` is fine.
 - On the Edit game screen: "Kind of project" HTML, "This file will be played in the browser" ticked, and an embed of 480 by 272 (the game is 240 by 136 and scales to fit).
 - The cover is `assets/cover.png` (630 by 500) and the screenshots are `assets/screenshots/`, both made by `tools/make_assets.sh` from the real renderer.
-- **Sound is placeholder:** the page plays simple square-wave blips, not the cart's own sfx and music. Replace before shipping if you want the original sound.
+- Sound: the effects and stingers are Anvil-made square-wave sounds (`assets/pyramid.world.json`, WAVs in `assets/sfx/`), not the cart's own sfx and music.
 - The page text above was written from the cart's code, not from the live itch page (not read).
