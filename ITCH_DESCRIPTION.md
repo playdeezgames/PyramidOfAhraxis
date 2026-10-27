@@ -17,7 +17,9 @@ Health is score too: the final tally counts your health, kills, jools, keys and 
 
 **Controls:** S starts and I shows the instructions on the title screen. Arrow keys move (hold to keep walking), Q quaffs a potion to restore your health to full, F2 resets the game. On a phone or tablet, swipe to move.
 
-**Made with:** the original was made in TIC-80 (September 2023). This version is a port to Odin, compiled to WebAssembly and drawn to a plain 2D canvas, with the original's rules, map, pixel art and look kept as they were. The port was made with Claude (generative AI) working alongside TheGrumpyGameDev.
+**Credits:** Urizen 1-bit tileset by vurmux, https://vurmux.itch.io/urizen-onebit-tileset (CC0). DINOBYTE bitmap font by mby, https://mby.itch.io/dinobyte, licensed CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/), used unmodified. Sounds made with the Anvil of SPLORR!!.
+
+**Made with:** the original was made in TIC-80 (September 2023). This version is a port to Odin, compiled to WebAssembly and drawn to a plain 2D canvas, with the original's rules and map kept as they were. The pictures are redrawn with the Urizen 1-bit tileset and the text uses the DINOBYTE font (credits below). The port was made with Claude (generative AI) working alongside TheGrumpyGameDev.
 
 ## Notes (not for the page)
 

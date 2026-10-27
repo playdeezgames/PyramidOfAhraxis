@@ -1,0 +1,13 @@
+DINOBYTE bitmap font by mby
+Page: https://mby.itch.io/dinobyte
+Licence: Creative Commons Attribution 4.0 International (CC BY 4.0)
+Legal code: https://creativecommons.org/licenses/by/4.0/legalcode
+
+Terms as stated on the itch.io page (read October 10, 2026):
+  You can use this font both in free and in commercial projects.
+  You must give appropriate credit, provide a link to the license,
+  and indicate if changes were made.
+
+No licence file is distributed with the font; this note records the page.
+Suggested credit line:
+  DINOBYTE bitmap font by mby, https://mby.itch.io/dinobyte, CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/)

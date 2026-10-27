@@ -63,8 +63,8 @@ number_text :: proc(t: ^testing.T) {
 
 @(test)
 glyph_widths :: proc(t: ^testing.T) {
-	testing.expect_value(t, glyph_size('A'), 5)
-	testing.expect_value(t, glyph_size(' '), 3)
+	testing.expect_value(t, text_width("Key"), 18)
+	testing.expect_value(t, text_width("Hi", 2), 24)
 }
 
 @(test)

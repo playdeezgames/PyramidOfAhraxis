@@ -1,19 +1,63 @@
 package game
 
-// Software renderer for TIC-80's 240x136 screen: palette-indexed pixels, resolved to RGBA
-// for the page. Mirrors the cart's cls/spr/map/print calls.
+// Software renderer for a 240x136 screen: palette-indexed pixels, resolved to RGBA for the page.
+// Pictures are Urizen 12x12 tiles (gfx.odin), text is the 6x8 DINOBYTE font (font.odin).
 
 SCREEN_W :: 240
 SCREEN_H :: 136
+
+TILE :: 12 // pixels per map cell
+VIEW :: 11 // cells across and down the play window, centred on the player
+VIEW_Y :: (SCREEN_H - VIEW * TILE) / 2
+HUD_X :: VIEW * TILE + 4
+
+GLYPH_W :: 6
+GLYPH_H :: 8
 
 Frame :: struct {
 	px:   [SCREEN_W * SCREEN_H]u8, // palette indices
 	rgba: [SCREEN_W * SCREEN_H]u32, // 0xAABBGGRR (little-endian R,G,B,A bytes)
 }
 
-// Palette colours the cart names.
+// Palette colours the game names.
 COLOR_BLACK :: 0
 COLOR_BG :: 15
+
+// Order matches PICKS in tools/extract_gfx.py.
+Gfx :: enum {
+	Wall,
+	Door,
+	Door_Window,
+	Exit,
+	Trap,
+	Key,
+	Potion,
+	Jool,
+	Shield,
+	Sword,
+	Monster,
+	Player,
+	Dead,
+	Heart,
+}
+
+// Cart tile ids with behaviour (see game.odin); anything else is open floor.
+tile_gfx :: proc(id: int) -> (g: Gfx, ok: bool) {
+	switch id {
+	case 1: return .Wall, true
+	case 2: return .Door, true
+	case 3: return .Door_Window, true
+	case 8: return .Exit, true
+	case 41: return .Trap, true
+	case 66: return .Monster, true
+	case 128: return .Key, true
+	case 129: return .Potion, true
+	case 130: return .Jool, true
+	case 131: return .Shield, true
+	case 132: return .Sword, true
+	}
+	return {}, false
+}
 
 cls :: proc(f: ^Frame, c: u8) {
 	for &p in f.px {
@@ -28,86 +72,68 @@ set_px :: proc(f: ^Frame, x, y: int, c: u8) {
 	f.px[y * SCREEN_W + x] = c
 }
 
-// spr(id, x, y, colorkey): colorkey < 0 draws every pixel.
-spr :: proc(f: ^Frame, id: int, x, y: int, colorkey: int = -1) {
-	for j in 0 ..< 8 {
-		for i in 0 ..< 8 {
-			c := TILES[id * 64 + j * 8 + i]
-			if int(c) != colorkey {
+// Draws a picture at (x, y); background pixels (index 0) are drawn only when opaque is set.
+draw_gfx :: proc(f: ^Frame, g: Gfx, x, y: int, opaque := false) {
+	for j in 0 ..< TILE {
+		for i in 0 ..< TILE {
+			c := GFX[g][j * TILE + i]
+			if c != 0 || opaque {
 				set_px(f, x + i, y + j, c)
 			}
 		}
 	}
 }
 
-// map(cx, cy, w, h) at screen (0,0), no colour key. Cells off the map read as tile 0.
-draw_map :: proc(f: ^Frame, g: ^Game, cx, cy, w, h: int) {
-	for j in 0 ..< h {
-		for i in 0 ..< w {
-			spr(f, int(mget(g, cx + i, cy + j)), i * 8, j * 8)
-		}
-	}
-}
-
-// Lit column range of a glyph: leftmost column and width. TIC-80 draws a proportional glyph
-// starting at its leftmost lit column. A space (nothing lit) is 3 wide.
-glyph_extent :: proc(ch: u8) -> (left, size: int) {
-	if ch == ' ' {
-		return 0, 3
-	}
-	lo, hi := 8, -1
-	for row in FONT[ch & 127] {
-		for c in 0 ..< 8 {
-			if row & (1 << uint(c)) != 0 {
-				lo = min(lo, c)
-				hi = max(hi, c)
+// The play window: cells off the map read as floor.
+draw_map :: proc(f: ^Frame, g: ^Game, cx, cy: int) {
+	for j in 0 ..< VIEW {
+		for i in 0 ..< VIEW {
+			x, y := i * TILE, VIEW_Y + j * TILE
+			for yy in 0 ..< TILE {
+				for xx in 0 ..< TILE {
+					set_px(f, x + xx, y + yy, COLOR_BLACK)
+				}
+			}
+			if gfx, ok := tile_gfx(int(mget(g, cx + i, cy + j))); ok {
+				draw_gfx(f, gfx, x, y)
 			}
 		}
 	}
-	if hi < 0 {
-		return 0, 0
-	}
-	return lo, hi - lo + 1
 }
 
-glyph_size :: proc(ch: u8) -> int {
-	_, size := glyph_extent(ch)
-	return size
+text_width :: proc(text: string, scale: int = 1) -> int {
+	return len(text) * GLYPH_W * scale
 }
 
-// print(text, x, y, color, false, scale): proportional, one blank column between glyphs.
-print :: proc(f: ^Frame, text: string, x, y: int, color: u8 = 15, scale: int = 1) -> int {
-	cx := x
+// Monospaced print; returns the width drawn.
+print :: proc(f: ^Frame, text: string, x, y: int, color: u8 = 12, scale: int = 1) -> int {
 	for i in 0 ..< len(text) {
-		ch := text[i]
-		left, size := glyph_extent(ch)
-		for row, j in FONT[ch & 127] {
-			for c in 0 ..< 8 {
-				if row & (1 << uint(c)) == 0 {
+		bits := FONT[text[i]]
+		for row in 0 ..< GLYPH_H {
+			for col in 0 ..< GLYPH_W {
+				if bits & (1 << uint(row * GLYPH_W + col)) == 0 {
 					continue
 				}
 				for sy in 0 ..< scale {
 					for sx in 0 ..< scale {
-						set_px(f, cx + (c - left) * scale + sx, y + j * scale + sy, color)
+						set_px(f, x + (i * GLYPH_W + col) * scale + sx, y + row * scale + sy, color)
 					}
 				}
 			}
 		}
-		cx += (size + 1) * scale
 	}
-	return cx - x
+	return text_width(text, scale)
 }
 
-// shadow(text, x, y, fg=12, bg=0, scale=1)
+// print with a drop shadow one pixel down and right.
 shadow :: proc(f: ^Frame, text: string, x, y: int, fg: u8 = 12, bg: u8 = 0, scale: int = 1) {
 	print(f, text, x + 1, y + 1, bg, scale)
 	print(f, text, x, y, fg, scale)
 }
 
-hline :: proc(f: ^Frame, s: int, l: int, x, y: int) {
-	for i in 0 ..< l {
-		spr(f, s, x + i * 8, y, 0)
-	}
+// Shadowed text centred on the screen.
+center :: proc(f: ^Frame, text: string, y: int, fg: u8 = 12, scale: int = 1) {
+	shadow(f, text, (SCREEN_W - text_width(text, scale)) / 2, y, fg, 0, scale)
 }
 
 // Writes palette indices through the palette into rgba.
@@ -120,79 +146,80 @@ resolve :: proc(f: ^Frame) {
 
 draw_menu :: proc(f: ^Frame) {
 	cls(f, COLOR_BG)
-	shadow(f, "============================", 8, 6, 9, 0, 2)
-	shadow(f, "==Pyramid of Ahraxis==", 6, 18, 9, 0, 2)
-	shadow(f, "============================", 8, 30, 9, 0, 2)
-	shadow(f, "S-Start", 101, 63)
-	shadow(f, "I-Instructions", 82, 75)
-	shadow(f, "A Production of", 79, 118, 14)
-	shadow(f, "TheGrumpyGameDev", 73, 124, 6)
-	shadow(f, "September 2023", 80, 130, 14)
+	center(f, "\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB", 8, 9, 1)
+	center(f, "Pyramid of Ahraxis", 18, 9, 2)
+	center(f, "\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC", 36, 9, 1)
+	draw_gfx(f, .Player, 114, 52)
+	center(f, "S-Start", 74)
+	center(f, "I-Instructions", 86)
+	center(f, "A Production of", 104, 14)
+	center(f, "TheGrumpyGameDev", 112, 6)
+	center(f, "September 2023", 122, 14)
 }
 
 draw_help :: proc(f: ^Frame) {
 	cls(f, COLOR_BG)
 	shadow(f, "Instructions", 0, 0, 9, 0, 2)
-	shadow(f, "Controls(in-game):", 0, 18, 3)
-	shadow(f, "Arrows: Move", 0, 24)
-	shadow(f, "F2: Reset", 24, 30)
-	shadow(f, "Q: Quaff(potion)", 30, 36)
-	shadow(f, "Sprites:", 0, 48, 3)
-	spr(f, 64, 0, 56)
-	shadow(f, "You", 9, 57)
-	spr(f, 128, 0, 64)
-	shadow(f, "Key", 9, 65)
-	spr(f, 129, 0, 72)
-	shadow(f, "Potion", 9, 73)
-	spr(f, 131, 0, 80)
-	shadow(f, "Shield", 9, 81)
-	spr(f, 132, 0, 88)
-	shadow(f, "Sword", 9, 89)
-	spr(f, 130, 60, 56)
-	shadow(f, "JOOLS!!", 69, 57)
-	spr(f, 1, 60, 64)
-	shadow(f, "Wall", 69, 65)
-	spr(f, 192, 60, 72)
-	shadow(f, "Health", 69, 73)
-	spr(f, 2, 60, 80)
-	shadow(f, "Door", 69, 81)
-	spr(f, 41, 60, 88)
-	shadow(f, "Trap", 69, 89)
-	shadow(f, "Press Any Key to go Back", 0, 130, 14)
+	shadow(f, "Controls (in-game):", 0, 20, 3)
+	shadow(f, "Arrows: Move  F2: Reset  Q: Quaff", 0, 29)
+	shadow(f, "Pictures:", 0, 42, 3)
+	rows := [?]struct {
+		g:    Gfx,
+		name: string,
+	}{{.Player, "You"}, {.Key, "Key"}, {.Potion, "Potion"}, {.Shield, "Shield"}, {.Sword, "Sword"}}
+	more := [?]struct {
+		g:    Gfx,
+		name: string,
+	}{{.Jool, "JOOLS!!"}, {.Wall, "Wall"}, {.Heart, "Health"}, {.Door, "Door"}, {.Trap, "Trap"}}
+	for r, i in rows {
+		draw_gfx(f, r.g, 0, 52 + i * 14)
+		shadow(f, r.name, 16, 54 + i * 14)
+	}
+	for r, i in more {
+		draw_gfx(f, r.g, 120, 52 + i * 14)
+		shadow(f, r.name, 136, 54 + i * 14)
+	}
+	shadow(f, "Press Any Key to go Back", 0, 126, 14)
+}
+
+// HUD row: a picture and a count, 14 px apart.
+hud_row :: proc(f: ^Frame, g: Gfx, n: int, row: int, color: u8 = 12) {
+	y := row * 14
+	draw_gfx(f, g, HUD_X, y)
+	buf: [16]u8
+	print(f, num_text(buf[:], "x", n), HUD_X + 16, y + 2, color)
 }
 
 draw_play :: proc(f: ^Frame, g: ^Game) {
 	cls(f, COLOR_BG)
-	draw_map(f, g, g.x - 8, g.y - 8, 17, 17)
-	spr(f, alive(g) ? 64 : 65, 64, 64)
-	hline(f, 192, g.h, 136, 0)
-	hline(f, 128, g.ks, 136, 8)
-	hline(f, 129, g.ps, 136, 16)
-	spr(f, 130, 136, 24, 0)
-	buf: [16]u8
-	print(f, num_text(buf[:], "x", g.js), 144, 24, 11)
-	hline(f, 132, g.as, 136, 32)
-	hline(f, 131, g.ds, 136, 40)
+	draw_map(f, g, g.x - VIEW / 2, g.y - VIEW / 2)
+	draw_gfx(f, alive(g) ? .Player : .Dead, (VIEW / 2) * TILE, VIEW_Y + (VIEW / 2) * TILE)
+	hud_row(f, .Heart, g.h, 0)
+	hud_row(f, .Key, g.ks, 1)
+	hud_row(f, .Potion, g.ps, 2)
+	hud_row(f, .Jool, g.js, 3, 11)
+	hud_row(f, .Sword, g.as, 4)
+	hud_row(f, .Shield, g.ds, 5)
 	if mget(g, g.x, g.y) == TRAP_SPRUNG {
-		print(f, "TRAP!", 136, 48, 12)
+		print(f, "TRAP!", HUD_X, 86, 12)
 	}
-	shadow(f, "Arrows: Move", 136, 112)
-	shadow(f, "F2: Reset", 136, 120)
-	shadow(f, "Q: Quaff Potion", 136, 128)
+	shadow(f, "Arrows: Move", HUD_X, 104)
+	shadow(f, "F2: Reset", HUD_X, 112)
+	shadow(f, "Q: Quaff Potion", HUD_X, 120)
 }
 
 draw_score :: proc(f: ^Frame, g: ^Game) {
 	cls(f, COLOR_BLACK)
 	shadow(f, "Score:", 0, 0, 9, 0, 2)
 	buf: [48]u8
-	shadow(f, line_text(buf[:], "Health x ", g.h, 100), 0, 16)
-	shadow(f, line_text(buf[:], "Kills x ", g.ms, 50), 0, 24)
-	shadow(f, line_text(buf[:], "Jools x ", g.js, 250), 0, 32)
-	shadow(f, line_text(buf[:], "Keys x ", g.ks, 500), 0, 40)
-	shadow(f, line_text(buf[:], "Potions x ", g.ps, 75), 0, 48)
+	shadow(f, line_text(buf[:], "Health x ", g.h, 100), 0, 20)
+	shadow(f, line_text(buf[:], "Kills x ", g.ms, 50), 0, 30)
+	shadow(f, line_text(buf[:], "Jools x ", g.js, 250), 0, 40)
+	shadow(f, line_text(buf[:], "Keys x ", g.ks, 500), 0, 50)
+	shadow(f, line_text(buf[:], "Potions x ", g.ps, 75), 0, 60)
 	total: [24]u8
-	shadow(f, num_text(total[:], "Total = ", score(g)), 0, 120)
-	shadow(f, "F2: Reset", 0, 128, 14)
+	shadow(f, num_text(total[:], "Total = ", score(g)), 0, 112)
+	shadow(f, "F2: Reset", 0, 126, 14)
 }
 
 draw_game :: proc(f: ^Frame, g: ^Game) {
