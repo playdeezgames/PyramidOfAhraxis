@@ -21,8 +21,9 @@ Health is score too: the final tally counts your health, kills, jools, keys and 
 
 ## Notes (not for the page)
 
-- Push target: `thegrumpygamedev/pyramid-of-ahraxis:html`. `shippit.sh` wraps `tools/ship.sh`, which tests, builds with `-o:size` and zips; it only pushes with `--push`. The old `shippit.sh` (export, push, commit) is replaced. **The live page's channel names were not checked**; confirm `html` exists before the first push (a new channel name is a separate upload, see the Release standard in the bok).
-- **AI disclosure needs your decision:** if the live page is tagged "No generative AI was used" (as Wandermaze's is), the port contradicts it. Nothing here changes the page.
+- Push target: `thegrumpygamedev/pyramid-of-ahraxis:html`. `shippit.sh` wraps `tools/ship.sh`, which tests, builds with `-o:size` and zips; it only pushes with `--push`. The old `shippit.sh` (export, push, commit) is replaced. **The live page's channel names were not checked and the author was unsure an `html` channel exists**; confirm `html` exists before the first push (a new channel name is a separate upload, see the Release standard in the bok).
+- **AI disclosure (decided October 27, 2026):** remove the "No generative AI was used" tag from the live page if present; the "made with Claude" line stays. Nothing here changes the page until a ship.
+- **Do not ship before October 29, 2026** (avoid spamming itch feeds). `git push` is fine.
 - On the Edit game screen: "Kind of project" HTML, "This file will be played in the browser" ticked, and an embed of 480 by 272 (the game is 240 by 136 and scales to fit).
 - The cover is `assets/cover.png` (630 by 500) and the screenshots are `assets/screenshots/`, both made by `tools/make_assets.sh` from the real renderer.
 - **Sound is placeholder:** the page plays simple square-wave blips, not the cart's own sfx and music. Replace before shipping if you want the original sound.

@@ -19,7 +19,9 @@ The game is the single cartridge `pyramid.tic` (68 KB, 240x136 map plus tiles, p
 - **Coxswain:** register as agent `araxis` (`agent_register` takes `agent`, not `agent_id`) and track work in the coxswain project `pyramid-of-ahraxis`.
 - **Bok guidance:** the vault at `/home/yermom/git/bok-of-splorr` (added as a working directory) is the rulebook. Read `splorr/Home.md` (standing rules), `splorr/Tech/Odin wasm recipe.md`, `splorr/Tech/Release standard.md`, `splorr/Gotchas.md` and `splorr/Games/Wandermaze.md`. Key rules: never `git push` and never run `shippit.sh --push` / `butler push` unless the user says so ("push" = `git push`, "ship" = itch.io); an itch.io game is a "Metaphor" in user-facing copy; anything an AI posts on itch.io must say so; the port needs a vault game note (`Games/Pyramid of Ahraxis.md`, linked from `Home.md`, plus a row in `Strategy/Steam pivot evaluation.md`) once it is real.
 - **Anvil** (`anvil-prod` MCP) is for structuring sprites, palette, map, and sound (square-wave sfx, WAV export) when the port needs generated assets. Use it for the sound and any redrawn graphics; recovering the original tiles and map is done straight from the cart.
-- **AI-disclosure decision:** the live itch page may be tagged "No generative AI was used" (as Wandermaze's was). Ask the user before the port goes live; do not decide it.
+- **AI-disclosure decision:** the live itch page may be tagged "No generative AI was used" (as Wandermaze's was). Decided October 27, 2026: remove that tag and keep the "made with Claude" line in the copy (applied only at ship time).
+- **Ship hold:** do not ship to itch (`tools/ship.sh --push`, `shippit.sh --push`, `butler push`) before **October 29, 2026**; the user does not want to spam itch feeds. `git push` to origin is fine. The live page's `html` channel is unconfirmed.
+- **Audio decision:** replace the placeholder blips with Anvil-made sounds (not a TIC-80 replayer, not `music.wav`).
 
 ## Commands
 
