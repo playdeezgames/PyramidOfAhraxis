@@ -1,4 +1,7 @@
 # PyramidOfAhraxis
+
+> The log, TODOs, commands and inventory below describe the 2023 COBOL text adventure (`old/`). The game in this repo's root is the TIC-80 cart `pyramid.tic`, being ported to Odin/wasm; see `CLAUDE.md`.
+
 https://watabou.github.io/one-page-dungeon/?seed=1653868650
 
 ## Log:
