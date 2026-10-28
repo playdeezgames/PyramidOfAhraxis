@@ -12,5 +12,5 @@ for i, n in enumerate(['menu', 'play', 'help', 'score'], 1):
 # Cover: the title screen at 2x over a strip of the dungeon at 2x, integer scaling only.
 cover = Image.new('RGB', (630, 500), (26, 28, 44))
 cover.paste(frame('menu').resize((480, 272), Image.NEAREST), (75, 8))
-cover.paste(frame('play').crop((0, 14, 136, 122)).resize((272, 216), Image.NEAREST), (179, 284))
+cover.paste(frame('play').crop((0, 0, 240, 104)).resize((480, 208), Image.NEAREST), (75, 288))
 cover.save(os.path.join(ROOT, 'assets/cover.png'))

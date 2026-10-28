@@ -164,7 +164,7 @@ draw_help :: proc(f: ^Frame) {
 	shadow(f, "Instructions", 0, 0, 9, 0, 2)
 	shadow(f, "Controls (in-game):", 0, 20, 3)
 	shadow(f, "Arrows: Move  F2: Reset  P: Potion", 0, 29)
-	shadow(f, "Pictures:", 0, 42, 3)
+	shadow(f, "Pictures:", 0, 38, 3)
 	rows := [?]struct {
 		g:    Gfx,
 		name: string,
@@ -174,14 +174,16 @@ draw_help :: proc(f: ^Frame) {
 		name: string,
 	}{{.Jool, "JOOLS!!"}, {.Wall, "Wall"}, {.Heart, "Health"}, {.Door, "Door"}, {.Trap, "Trap"}}
 	for r, i in rows {
-		draw_gfx(f, r.g, 0, 52 + i * 14)
-		shadow(f, r.name, 16, 54 + i * 14)
+		draw_gfx(f, r.g, 0, 48 + i * 12)
+		shadow(f, r.name, 16, 50 + i * 12)
 	}
 	for r, i in more {
-		draw_gfx(f, r.g, 120, 52 + i * 14)
-		shadow(f, r.name, 136, 54 + i * 14)
+		draw_gfx(f, r.g, 120, 48 + i * 12)
+		shadow(f, r.name, 136, 50 + i * 12)
 	}
-	shadow(f, "Press Any Key to go Back", 0, 126, 14)
+	shadow(f, "Art: Urizen by vurmux (CC0)", 0, 111, 13)
+	shadow(f, "Font: DINOBYTE by mby (CC BY 4.0)", 0, 119, 13)
+	shadow(f, "Press Any Key to go Back", 0, 128, 12)
 }
 
 // Floating messages: centred on their cell, rising one pixel every three frames, blinking out.
