@@ -51,6 +51,7 @@ TILE_DOOR :: 2 // one lock
 TILE_GATE1 :: 3 // one lock
 TILE_GATE2 :: 4 // two locks (generated levels only)
 TILE_GATE3 :: 5 // three locks (generated levels only)
+TILE_BRAZIER :: 6 // a fixed light; solid
 TILE_EXIT :: 8
 TILE_TRAP :: 9
 TILE_MONSTER :: 66
@@ -59,6 +60,18 @@ TILE_POTION :: 129
 TILE_JOOL :: 130
 TILE_SHIELD :: 131
 TILE_SWORD :: 132
+TILE_TORCH :: 133 // pickup: light for a while
+TILE_LANTERN :: 134 // pickup: a bigger light, and light for longer
+
+// Light: the player's light burns one unit of fuel per step and is the clock of the dungeon.
+TORCH_FUEL :: 60
+LANTERN_FUEL :: 150
+FUEL_MAX :: 600
+DARK_BITE :: 10 // steps spent in the dark per heart lost
+LIGHT_TORCH :: 4 // radius of the player's light, in cells
+LIGHT_LANTERN :: 6
+LIGHT_DARK :: 1 // what you see once the fuel is gone
+LIGHT_BRAZIER :: 3
 
 FLAG_DOOR :: 6
 FLAG_SOLID :: 7
@@ -69,6 +82,8 @@ Level :: struct {
 	hint:             string,
 	w, h:             int,
 	start_x, start_y: int,
+	fuel:             int, // fuel for the light granted on arrival
+	theme:            int, // see THEMES in render.odin
 	tiles:            []u8,
 }
 
@@ -80,6 +95,11 @@ Game :: struct {
 	mw, mh: int,
 	level:  int,
 	banner: bool, // show the level title until the first step
+	fuel:   int, // steps of light left
+	lantern: bool, // the light is a lantern (bigger radius)
+	dark:   int, // steps taken with no light
+	vis:    [MAP_W * MAP_H]bool, // cells lit right now
+	seen:   [MAP_W * MAP_H]bool, // cells ever lit on this level
 	x, y:   int,
 	h:      int, // health
 	ks:     int, // keys
@@ -161,6 +181,117 @@ load_level :: proc(g: ^Game, n: int) {
 	g.x, g.y = lv.start_x, lv.start_y
 	g.floats = {}
 	g.banner = true
+	g.fuel = min(g.fuel + lv.fuel, FUEL_MAX)
+	g.seen = {}
+	see(g)
+}
+
+// Does this tile stop light (and sight)?
+blocks_light :: proc(c: u8) -> bool {
+	return c == 1 || c == TILE_BRAZIER || locks_of(c) > 0
+}
+
+// True when no light-blocking cell lies strictly between the two cells (Bresenham).
+@(private)
+clear_line :: proc(g: ^Game, x0, y0, x1, y1: int) -> bool {
+	dx, dy := abs(x1 - x0), abs(y1 - y0)
+	sx: int = x0 < x1 ? 1 : -1
+	sy: int = y0 < y1 ? 1 : -1
+	err := dx - dy
+	x, y := x0, y0
+	for x != x1 || y != y1 {
+		if (x != x0 || y != y0) && blocks_light(mget(g, x, y)) {
+			return false
+		}
+		e2 := 2 * err
+		if e2 > -dy {
+			err -= dy
+			x += sx
+		}
+		if e2 < dx {
+			err += dx
+			y += sy
+		}
+	}
+	return true
+}
+
+// Radius of the light the player carries.
+light_radius :: proc(g: ^Game) -> int {
+	if g.fuel <= 0 {
+		return LIGHT_DARK
+	}
+	return g.lantern ? LIGHT_LANTERN : LIGHT_TORCH
+}
+
+@(private)
+light_from :: proc(g: ^Game, cx, cy, radius: int) {
+	for y in cy - radius ..= cy + radius {
+		for x in cx - radius ..= cx + radius {
+			if x < 0 || y < 0 || x >= g.mw || y >= g.mh {
+				continue
+			}
+			dx, dy := x - cx, y - cy
+			if dx * dx + dy * dy > radius * radius + radius {
+				continue
+			}
+			if clear_line(g, cx, cy, x, y) {
+				g.vis[y * g.mw + x] = true
+			}
+		}
+	}
+}
+
+// Works out which cells are lit (the player's light and every brazier) and remembers them.
+see :: proc(g: ^Game) {
+	g.vis = {}
+	light_from(g, g.x, g.y, light_radius(g))
+	for y in 0 ..< g.mh {
+		for x in 0 ..< g.mw {
+			if g.map_[y * g.mw + x] == TILE_BRAZIER {
+				light_from(g, x, y, LIGHT_BRAZIER)
+			}
+		}
+	}
+	for v, i in g.vis {
+		if v {
+			g.seen[i] = true
+		}
+	}
+}
+
+// True when the cell is lit right now (off the map is never lit).
+lit :: proc(g: ^Game, x, y: int) -> bool {
+	if x < 0 || y < 0 || x >= g.mw || y >= g.mh {
+		return false
+	}
+	return g.vis[y * g.mw + x]
+}
+
+// A step costs light; with none left the dark bites every DARK_BITE steps.
+// Reports whether the dark killed you.
+@(private)
+burn :: proc(g: ^Game) -> bool {
+	if g.fuel > 0 {
+		g.fuel -= 1
+		g.dark = 0
+		if g.fuel == 0 {
+			say(g, "Light dies", 3)
+		}
+		return false
+	}
+	g.dark += 1
+	if g.dark % DARK_BITE == 0 {
+		g.h -= 1
+		if g.h <= 0 {
+			play(g, .Music_Death)
+			say(g, "You died!", 3)
+			return true
+		}
+		play(g, .Monster_Hit)
+		say(g, "The dark bites!", 3)
+	}
+	return false
 }
 
 // mget: cells outside the map read as 0.
@@ -199,7 +330,7 @@ fewer_locks :: proc(locks: int) -> u8 {
 }
 
 is_solid :: proc(c: u8) -> bool {
-	return fget(c, FLAG_SOLID) || locks_of(c) > 0
+	return fget(c, FLAG_SOLID) || locks_of(c) > 0 || c == TILE_BRAZIER
 }
 
 fget :: proc(tile: u8, flag: uint) -> bool {
@@ -230,6 +361,43 @@ score :: proc(g: ^Game) -> int {
 	return g.h * 100 + g.ms * 50 + g.js * 250 + g.ks * 500 + g.ps * 75
 }
 
+// A monster's blow lands: a shield turns it aside, otherwise it costs a heart.
+@(private)
+monster_hits :: proc(g: ^Game, text: string) {
+	if g.ds > 0 {
+		play(g, .Shield_Block)
+		say(g, "Shield blocks", 9)
+		g.ds -= 1
+	} else {
+		g.h -= 1
+		if g.h <= 0 {
+			play(g, .Music_Death)
+			say(g, "You died!", 3)
+		} else {
+			play(g, .Monster_Hit)
+			say(g, text, 3)
+		}
+	}
+}
+
+// Not in the cart: a monster beside you (up, down, left or right) strikes when you step to a
+// cell that is no longer beside it. Sliding along it, or killing it first, is free.
+// Reports whether the blow killed you.
+@(private)
+strike :: proc(g: ^Game, ox, oy: int) -> bool {
+	for d in ([4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+		mx, my := ox + d[0], oy + d[1]
+		if mget(g, mx, my) != TILE_MONSTER || abs(mx - g.x) + abs(my - g.y) == 1 {
+			continue
+		}
+		monster_hits(g, "Monster strikes!")
+		if !alive(g) {
+			return true
+		}
+	}
+	return false
+}
+
 // Mv(dx, dy). Faithful quirk: a sword kill still lets the same bump resolve the
 // shield/health branch, so the monster hits back on the turn it dies.
 @(private)
@@ -254,20 +422,7 @@ move :: proc(g: ^Game, dx, dy: int) {
 				g.ms += 1
 				mset(g, nx, ny, 0)
 			}
-			if g.ds > 0 {
-				play(g, .Shield_Block)
-				say(g, "Shield blocks", 9)
-				g.ds -= 1
-			} else {
-				g.h -= 1
-				if g.h <= 0 {
-					play(g, .Music_Death)
-					say(g, "You died!", 3)
-				} else {
-					play(g, .Monster_Hit)
-					say(g, "Ouch! -1 health", 3)
-				}
-			}
+			monster_hits(g, "Ouch! -1 health")
 		} else {
 			play(g, .Bump)
 			if locks > 1 {
@@ -279,7 +434,11 @@ move :: proc(g: ^Game, dx, dy: int) {
 		}
 		return
 	}
+	ox, oy := g.x, g.y
 	g.x, g.y = nx, ny
+	if strike(g, ox, oy) || burn(g) {
+		return
+	}
 	switch c {
 	case TILE_EXIT:
 		play(g, .Music_Exit)
@@ -313,6 +472,17 @@ move :: proc(g: ^Game, dx, dy: int) {
 		say(g, "+1 sword", 12)
 		mset(g, nx, ny, 0)
 		g.as += 1
+	case TILE_TORCH:
+		play(g, .Key)
+		say(g, "+60 light", 4)
+		mset(g, nx, ny, 0)
+		g.fuel = min(g.fuel + TORCH_FUEL, FUEL_MAX)
+	case TILE_LANTERN:
+		play(g, .Key)
+		say(g, "Lantern lit", 4)
+		mset(g, nx, ny, 0)
+		g.lantern = true
+		g.fuel = min(g.fuel + LANTERN_FUEL, FUEL_MAX)
 	case TILE_TRAP:
 		mset(g, nx, ny, TRAP_SPRUNG)
 		g.h -= 1
@@ -324,6 +494,7 @@ move :: proc(g: ^Game, dx, dy: int) {
 			say(g, "Trap! -1 health", 3)
 		}
 	}
+	see(g)
 }
 
 // Qf: quaffing always sets health to 3, even from full.

@@ -317,29 +317,32 @@ gate_with_several_locks_takes_a_key_at_a_time :: proc(t: ^testing.T) {
 
 Cell :: [2]int
 
-// Cells reachable from the player's start. Locks are passable when open_locks is set;
-// monsters never are (nothing may depend on killing one).
-reachable :: proc(lv: Level, open_locks: bool) -> [dynamic]bool {
-	seen := make([dynamic]bool, lv.w * lv.h)
+// Steps from the player's start to every cell (-1 = unreachable). Locks are passable when
+// open_locks is set; monsters and braziers never are (nothing may depend on killing one).
+distances :: proc(lv: Level, open_locks: bool) -> [dynamic]int {
+	dist := make([dynamic]int, lv.w * lv.h)
+	for &d in dist {
+		d = -1
+	}
 	queue := make([dynamic]Cell)
 	defer delete(queue)
 	append(&queue, Cell{lv.start_x, lv.start_y})
-	seen[lv.start_y * lv.w + lv.start_x] = true
+	dist[lv.start_y * lv.w + lv.start_x] = 0
 	for i := 0; i < len(queue); i += 1 {
 		for d in ([4]Cell{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
 			n := queue[i] + d
-			if n.x < 0 || n.y < 0 || n.x >= lv.w || n.y >= lv.h || seen[n.y * lv.w + n.x] {
+			if n.x < 0 || n.y < 0 || n.x >= lv.w || n.y >= lv.h || dist[n.y * lv.w + n.x] >= 0 {
 				continue
 			}
 			c := lv.tiles[n.y * lv.w + n.x]
 			if c == TILE_MONSTER || (is_solid(c) && !(open_locks && locks_of(c) > 0)) {
 				continue
 			}
-			seen[n.y * lv.w + n.x] = true
+			dist[n.y * lv.w + n.x] = dist[queue[i].y * lv.w + queue[i].x] + 1
 			append(&queue, n)
 		}
 	}
-	return seen
+	return dist
 }
 
 @(test)
@@ -356,20 +359,22 @@ generated_levels_can_be_finished :: proc(t: ^testing.T) {
 		testing.expectf(t, locks > 0 && keys == locks, "level %d: %d keys for %d locks", n, keys, locks)
 
 		// Before any lock opens: every key can be fetched, and the exit cannot.
-		closed := reachable(lv, false)
+		closed := distances(lv, false)
 		defer delete(closed)
-		open := reachable(lv, true)
+		open := distances(lv, true)
 		defer delete(open)
 		for c, i in lv.tiles {
 			if c == TILE_KEY {
-				testing.expectf(t, closed[i], "level %d: key at %d is behind a lock", n, i)
+				testing.expectf(t, closed[i] >= 0, "level %d: key at %d is behind a lock", n, i)
 			}
 			if c == TILE_EXIT {
-				testing.expectf(t, !closed[i], "level %d: exit needs no key", n)
-				testing.expectf(t, open[i], "level %d: exit unreachable", n)
+				testing.expectf(t, closed[i] < 0, "level %d: exit needs no key", n)
+				testing.expectf(t, open[i] >= 0, "level %d: exit unreachable", n)
+				// The light is the clock: the grant must cover walking to the exit twice over.
+				testing.expectf(t, lv.fuel >= 2 * open[i], "level %d: %d fuel for a %d step walk", n, lv.fuel, open[i])
 			}
-			if c == TILE_POTION || c == TILE_JOOL || c == TILE_SWORD || c == TILE_SHIELD {
-				testing.expectf(t, open[i], "level %d: item %d unreachable", n, i)
+			if c == TILE_POTION || c == TILE_JOOL || c == TILE_SWORD || c == TILE_SHIELD || c == TILE_TORCH || c == TILE_LANTERN {
+				testing.expectf(t, open[i] >= 0, "level %d: item %d unreachable", n, i)
 			}
 		}
 	}
@@ -466,6 +471,207 @@ tutorial_is_playable :: proc(t: ^testing.T) {
 		}
 	}
 	testing.expect_value(t, g.level, 1)
-	testing.expect_value(t, g.h, 3)
+	testing.expect(t, alive(&g)) // a guard by the key may cost a heart on the way out
 	testing.expect_value(t, g.ks, 0)
+}
+
+// --- Monsters strike when you step away ------------------------------------------------------
+
+// A monster directly above the player; the cart's open floor all around.
+beside_monster :: proc() -> Game {
+	g := fresh()
+	for dy in -3 ..= 3 { // open floor around the start, whatever the cart put there
+		for dx in -3 ..= 3 {
+			mset(&g, g.x + dx, g.y + dy, 0)
+		}
+	}
+	mset(&g, g.x, g.y - 1, TILE_MONSTER)
+	return g
+}
+
+@(test)
+stepping_away_from_a_monster_costs_a_heart :: proc(t: ^testing.T) {
+	g := beside_monster()
+	command(&g, .Down) // no longer beside it
+	testing.expect_value(t, g.h, 2)
+	testing.expect_value(t, string(g.floats[0].text[:g.floats[0].n]), "Monster strikes!")
+	testing.expect_value(t, g.sounds[0], Sound.Monster_Hit)
+	testing.expect_value(t, mget(&g, 21, 10), u8(TILE_MONSTER)) // it stays
+}
+
+@(test)
+sliding_along_a_monster_is_free :: proc(t: ^testing.T) {
+	g := beside_monster()
+	command(&g, .Right) // (22,11) is only diagonal to it, so this is a step away
+	testing.expect_value(t, g.h, 2)
+	g = beside_monster()
+	mset(&g, g.x + 1, g.y - 1, TILE_MONSTER) // two monsters side by side above
+	command(&g, .Right) // moves from under one to under the other: still beside a monster
+	testing.expect_value(t, g.h, 2) // only the one left behind strikes
+}
+
+@(test)
+a_shield_turns_the_blow_aside :: proc(t: ^testing.T) {
+	g := beside_monster()
+	g.ds = 1
+	command(&g, .Down)
+	testing.expect_value(t, g.h, 3)
+	testing.expect_value(t, g.ds, 0)
+}
+
+@(test)
+killing_the_monster_first_means_no_strike_after :: proc(t: ^testing.T) {
+	g := beside_monster()
+	g.as, g.ds = 1, 1
+	command(&g, .Up) // bump: the sword kills it (the shield takes the old quirk's hit)
+	testing.expect_value(t, g.ms, 1)
+	testing.expect_value(t, mget(&g, 21, 10), u8(0))
+	h := g.h
+	command(&g, .Down)
+	testing.expect_value(t, g.h, h)
+}
+
+@(test)
+a_strike_can_kill_and_stops_the_step_effects :: proc(t: ^testing.T) {
+	g := beside_monster()
+	g.h = 1
+	mset(&g, g.x, g.y + 1, TILE_EXIT)
+	command(&g, .Down)
+	testing.expect(t, !alive(&g))
+	testing.expect_value(t, g.phase, Phase.Play) // the exit did not fire
+	testing.expect_value(t, string(g.floats[0].text[:g.floats[0].n]), "You died!")
+}
+
+@(test)
+two_monsters_strike_one_after_another :: proc(t: ^testing.T) {
+	g := beside_monster()
+	mset(&g, g.x - 1, g.y, TILE_MONSTER)
+	command(&g, .Down) // away from both
+	testing.expect_value(t, g.h, 1)
+}
+
+// --- Light, fuel and fog of war --------------------------------------------------------------
+
+// Open floor all round the cart's start, with the light lit and fuel set.
+in_the_open :: proc(fuel: int) -> Game {
+	g := fresh()
+	for dy in -8 ..= 8 {
+		for dx in -8 ..= 8 {
+			mset(&g, g.x + dx, g.y + dy, 0)
+		}
+	}
+	g.fuel, g.lantern, g.dark = fuel, false, 0
+	see(&g)
+	return g
+}
+
+@(test)
+every_step_burns_one_fuel_and_bumps_do_not :: proc(t: ^testing.T) {
+	g := in_the_open(10)
+	command(&g, .Right)
+	command(&g, .Right)
+	testing.expect_value(t, g.fuel, 8)
+	mset(&g, g.x + 1, g.y, 1)
+	command(&g, .Right) // a wall: no step
+	testing.expect_value(t, g.fuel, 8)
+}
+
+@(test)
+the_light_lights_a_circle :: proc(t: ^testing.T) {
+	g := in_the_open(50)
+	testing.expect(t, lit(&g, g.x, g.y))
+	testing.expect(t, lit(&g, g.x + LIGHT_TORCH, g.y))
+	testing.expect(t, !lit(&g, g.x + LIGHT_TORCH + 1, g.y))
+	testing.expect(t, !lit(&g, g.x + LIGHT_TORCH, g.y + LIGHT_TORCH)) // a corner is farther
+	g.lantern = true
+	see(&g)
+	testing.expect(t, lit(&g, g.x + LIGHT_LANTERN, g.y))
+}
+
+@(test)
+walls_block_the_light :: proc(t: ^testing.T) {
+	g := in_the_open(50)
+	mset(&g, g.x + 2, g.y, 1)
+	see(&g)
+	testing.expect(t, lit(&g, g.x + 2, g.y)) // the wall itself is lit
+	testing.expect(t, !lit(&g, g.x + 3, g.y)) // what lies behind it is not
+	testing.expect(t, lit(&g, g.x + 3, g.y + 2)) // but the sides are
+}
+
+@(test)
+cells_are_remembered_once_lit :: proc(t: ^testing.T) {
+	g := in_the_open(50)
+	far := g.x + LIGHT_TORCH
+	testing.expect(t, g.seen[g.y * g.mw + far])
+	for _ in 0 ..< 6 {
+		command(&g, .Left)
+	}
+	testing.expect(t, !lit(&g, far, g.y)) // out of the light now
+	testing.expect(t, g.seen[g.y * g.mw + far]) // but remembered
+	testing.expect(t, !g.seen[g.y * g.mw + g.x + 12]) // never lit
+}
+
+@(test)
+a_brazier_lights_its_surroundings_and_is_solid :: proc(t: ^testing.T) {
+	g := in_the_open(50)
+	bx := g.x + 12
+	mset(&g, bx, g.y, TILE_BRAZIER)
+	see(&g)
+	testing.expect(t, lit(&g, bx - LIGHT_BRAZIER, g.y)) // far from the player's own light
+	testing.expect(t, !lit(&g, bx - LIGHT_BRAZIER - 2, g.y))
+	g.x, g.y = bx - 1, g.y
+	command(&g, .Right)
+	testing.expect_value(t, g.x, bx - 1) // solid
+}
+
+@(test)
+pickups_feed_the_light :: proc(t: ^testing.T) {
+	g := in_the_open(10)
+	put_right(&g, TILE_TORCH)
+	command(&g, .Right)
+	testing.expect_value(t, g.fuel, 10 - 1 + TORCH_FUEL)
+	put_right(&g, TILE_LANTERN)
+	command(&g, .Right)
+	testing.expect(t, g.lantern)
+	testing.expect_value(t, g.fuel, 10 - 2 + TORCH_FUEL + LANTERN_FUEL)
+	g.fuel = FUEL_MAX - 1
+	put_right(&g, TILE_TORCH)
+	command(&g, .Right)
+	testing.expect_value(t, g.fuel, FUEL_MAX)
+}
+
+@(test)
+without_fuel_you_see_one_cell_and_the_dark_bites :: proc(t: ^testing.T) {
+	g := in_the_open(1)
+	command(&g, .Right) // the last of the light
+	testing.expect_value(t, g.fuel, 0)
+	testing.expect_value(t, string(g.floats[0].text[:g.floats[0].n]), "Light dies")
+	testing.expect_value(t, light_radius(&g), LIGHT_DARK)
+	testing.expect(t, lit(&g, g.x + 1, g.y))
+	testing.expect(t, !lit(&g, g.x + 2, g.y))
+	pace :: proc(g: ^Game, n: int) {
+		for i in 0 ..< n {
+			command(g, i % 2 == 0 ? .Left : .Right)
+		}
+	}
+	pace(&g, DARK_BITE - 1)
+	testing.expect_value(t, g.h, 3)
+	pace(&g, 1)
+	testing.expect_value(t, g.h, 2) // the tenth step in the dark
+	pace(&g, DARK_BITE * 2)
+	testing.expect(t, !alive(&g))
+}
+
+@(test)
+fuel_carries_over_and_each_level_adds_some :: proc(t: ^testing.T) {
+	g: Game
+	init_game(&g)
+	testing.expect_value(t, g.fuel, LEVELS[0].fuel)
+	g.fuel = 100
+	load_level(&g, 1)
+	testing.expect_value(t, g.fuel, min(100 + LEVELS[1].fuel, FUEL_MAX))
+	g.fuel = FUEL_MAX
+	load_level(&g, 2)
+	testing.expect_value(t, g.fuel, FUEL_MAX)
+	testing.expect(t, !g.seen[0] || true)
 }

@@ -11,7 +11,7 @@ Walk the Pyramid of Ahraxis: find keys, dodge traps, fight monsters, grab the jo
 
 Into the pyramid you go. Seven levels wait: a short tutorial, five dungeons laid out by Watabou's One Page Dungeon generator, and the original map from the TIC-80 cart.
 
-Walk the tomb one step at a time. Pick up **keys** to open doors, **potions** to heal, **shields** to turn a monster's blow aside, **swords** to kill monsters, and **jools** for the score. Watch your step: some floor tiles are **traps**. Find each level's exit to go deeper; some gates have more than one lock and want a key for every keyhole. The last exit shows how you did.
+Walk the tomb one step at a time. Pick up **keys** to open doors, **potions** to heal, **shields** to turn a monster's blow aside, **swords** to kill monsters, and **jools** for the score. Watch your step: some floor tiles are **traps**, and a **monster** beside you strikes when you step away from it, so kill it with a sword, shrug the blow off with a shield, or keep it on your side as you pass. You carry a **light** that burns one step at a time; pick up torches and lanterns to keep it going, because in the dark you see almost nothing and it bites. Fixed braziers light the rooms they stand in. Find each level's exit to go deeper; some gates have more than one lock and want a key for every keyhole. The last exit shows how you did.
 
 Health is score too: the final tally counts your health, kills, jools, keys and spare potions.
 

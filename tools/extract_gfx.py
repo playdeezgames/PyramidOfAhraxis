@@ -28,6 +28,19 @@ PICKS = [
     ('Dead',      104, 10, 13),  # skeleton
     ('Heart',      78, 37, 2),
     ('Heart_Empty', 78, 37, 14),  # the same heart, darkened, for missing health
+    # Per-dungeon looks (a theme recolours these) and the light sources.
+    ('Wall_Brick',  0, 3, 2),    # red brick
+    ('Wall_Block',  7, 0, 4),    # framed sandstone block
+    ('Wall_Wood',   0, 4, 3),    # planks
+    ('Wall_Round', 22, 2, 10),   # dark brick with rounded corners
+    ('Floor_Dots',  2, 5, 15),   # dotted columns
+    ('Floor_Hatch', 3, 5, 15),   # diagonal hatch
+    ('Floor_Weave', 8, 5, 15),   # herringbone
+    ('Floor_Cross', 0, 6, 1),    # carpet crosses
+    ('Floor_Moss', 19, 6, 6),    # mossy ground
+    ('Candle',     30, 22, 12),  # a torch pickup
+    ('Lantern',    26, 22, 4),
+    ('Brazier',    28, 22, 3),   # a fixed light, solid
 ]
 
 def tile(col, row, color):

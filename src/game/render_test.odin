@@ -60,6 +60,7 @@ dump_frames :: proc(t: ^testing.T) {
 		g.phase = .Play
 		for n in 0 ..< len(LEVELS) {
 			load_level(&g, n)
+			g.banner = false
 			draw_game(f, &g)
 			buf: [256]u8
 			path := strings.concatenate({num_text(buf[:], DUMP_LEVELS, n), ".ppm"})

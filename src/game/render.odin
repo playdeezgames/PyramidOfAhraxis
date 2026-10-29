@@ -41,7 +41,41 @@ Gfx :: enum {
 	Dead,
 	Heart,
 	Heart_Empty,
+	Wall_Brick,
+	Wall_Block,
+	Wall_Wood,
+	Wall_Round,
+	Floor_Dots,
+	Floor_Hatch,
+	Floor_Weave,
+	Floor_Cross,
+	Floor_Moss,
+	Candle,
+	Lantern,
+	Brazier,
 }
+
+// How a level looks: its wall picture and colour, and what its floor is made of.
+Theme :: struct {
+	wall:        Gfx,
+	wall_color:  u8,
+	floor_bg:    u8,
+	floor:       Gfx,
+	floor_color: u8,
+	has_floor:   bool,
+}
+
+// Indexed by Level.theme (set per level in tools/import_opd.py). Theme 0 is the original look.
+THEMES := [?]Theme{
+	{wall = .Wall, wall_color = 13, floor_bg = COLOR_BLACK},
+	{wall = .Wall_Brick, wall_color = 2, floor_bg = COLOR_BLACK, floor = .Floor_Cross, floor_color = 1, has_floor = true},
+	{wall = .Wall_Block, wall_color = 12, floor_bg = COLOR_BLACK, floor = .Floor_Dots, floor_color = 15, has_floor = true},
+	{wall = .Wall_Block, wall_color = 4, floor_bg = COLOR_BLACK, floor = .Floor_Hatch, floor_color = 1, has_floor = true},
+	{wall = .Wall_Round, wall_color = 10, floor_bg = 8, floor = .Floor_Weave, floor_color = 15, has_floor = true},
+	{wall = .Wall_Wood, wall_color = 3, floor_bg = COLOR_BLACK, floor = .Floor_Moss, floor_color = 6, has_floor = true},
+}
+
+COLOR_DIM :: 15 // remembered cells
 
 // Cart tile ids with behaviour (see game.odin); anything else is open floor.
 tile_gfx :: proc(id: int) -> (g: Gfx, ok: bool) {
@@ -50,6 +84,9 @@ tile_gfx :: proc(id: int) -> (g: Gfx, ok: bool) {
 	case 2: return .Door, true
 	case 3: return .Door_Window, true
 	case 4, 5: return .Door_Window, true // gates with two and three locks
+	case 6: return .Brazier, true
+	case 133: return .Candle, true
+	case 134: return .Lantern, true
 	case 8: return .Exit, true
 	case 41: return .Trap, true
 	case 66: return .Monster, true
@@ -87,18 +124,54 @@ draw_gfx :: proc(f: ^Frame, g: Gfx, x, y: int, opaque := false) {
 	}
 }
 
-// The play window: cells off the map read as floor.
+// Draws a picture in one colour (a theme recolours walls and floors this way).
+draw_gfx_color :: proc(f: ^Frame, g: Gfx, x, y: int, color: u8) {
+	for j in 0 ..< TILE {
+		for i in 0 ..< TILE {
+			if GFX[g][j * TILE + i] != 0 {
+				set_px(f, x + i, y + j, color)
+			}
+		}
+	}
+}
+
+// The play window. Lit cells are drawn in full, remembered ones dimmed (without monsters),
+// and cells never lit stay black.
 draw_map :: proc(f: ^Frame, g: ^Game, cx, cy: int) {
+	theme := THEMES[LEVELS[g.level].theme]
 	for j in 0 ..< VIEW_H {
 		for i in 0 ..< VIEW_W {
 			x, y := i * TILE, VIEW_Y + j * TILE
-			for yy in 0 ..< TILE {
-				for xx in 0 ..< TILE {
-					set_px(f, x + xx, y + yy, COLOR_BLACK)
-				}
+			mx, my := cx + i, cy + j
+			bg := u8(COLOR_BLACK)
+			shown, remembered := false, false
+			if mx >= 0 && my >= 0 && mx < g.mw && my < g.mh {
+				shown = lit(g, mx, my)
+				remembered = !shown && g.seen[my * g.mw + mx]
 			}
-			t := mget(g, cx + i, cy + j)
-			if gfx, ok := tile_gfx(int(t)); ok {
+			if shown {
+				bg = theme.floor_bg
+			}
+			fill_rect(f, x, y, TILE, TILE, bg)
+			if !shown && !remembered {
+				continue
+			}
+			t := mget(g, mx, my)
+			if remembered {
+				if t == TILE_MONSTER {
+					continue
+				}
+				if gfx, ok := tile_gfx(int(t)); ok {
+					draw_gfx_color(f, t == 1 ? theme.wall : gfx, x, y, COLOR_DIM)
+				}
+				continue
+			}
+			if t != 1 && theme.has_floor {
+				draw_gfx_color(f, theme.floor, x, y, theme.floor_color)
+			}
+			if t == 1 {
+				draw_gfx_color(f, theme.wall, x, y, theme.wall_color)
+			} else if gfx, ok := tile_gfx(int(t)); ok {
 				draw_gfx(f, gfx, x, y)
 			}
 			if n := locks_of(t); n > 1 { // a gate that takes several keys shows how many
@@ -179,7 +252,7 @@ draw_help :: proc(f: ^Frame) {
 	more := [?]struct {
 		g:    Gfx,
 		name: string,
-	}{{.Jool, "JOOLS!!"}, {.Wall, "Wall"}, {.Heart, "Health"}, {.Door, "Door"}, {.Trap, "Trap"}}
+	}{{.Jool, "JOOLS!!"}, {.Candle, "Light"}, {.Heart, "Health"}, {.Door, "Door"}, {.Trap, "Trap"}}
 	for r, i in rows {
 		draw_gfx(f, r.g, 0, 48 + i * 12)
 		shadow(f, r.name, 16, 50 + i * 12)
@@ -278,16 +351,14 @@ draw_play :: proc(f: ^Frame, g: ^Game) {
 	hud_row(f, .Jool, g.js, 3, 11)
 	hud_row(f, .Sword, g.as, 4)
 	hud_row(f, .Shield, g.ds, 5)
-	if mget(g, g.x, g.y) == TRAP_SPRUNG {
-		print(f, "TRAP!", HUD_X, 86, 12)
-	}
+	hud_row(f, g.lantern ? .Lantern : .Candle, g.fuel, 6, g.fuel == 0 ? 3 : g.fuel <= 30 ? 4 : 12)
 	a, b: [12]u8
 	at := num_text(a[:], "Lv ", g.level + 1)
-	shadow(f, at, HUD_X, 94, 13)
-	shadow(f, num_text(b[:], "/", len(LEVELS)), HUD_X + text_width(at), 94, 13)
-	shadow(f, "Move:\x18\x19\x1B\x1A", HUD_X, 104)
-	shadow(f, "P:Potion", HUD_X, 112)
-	shadow(f, "F2:Reset", HUD_X, 120)
+	shadow(f, at, HUD_X, 97, 13)
+	shadow(f, num_text(b[:], "/", len(LEVELS)), HUD_X + text_width(at), 97, 13)
+	shadow(f, "Move:\x18\x19\x1B\x1A", HUD_X, 107)
+	shadow(f, "P:Potion", HUD_X, 115)
+	shadow(f, "F2:Reset", HUD_X, 123)
 }
 
 draw_score :: proc(f: ^Frame, g: ^Game) {
