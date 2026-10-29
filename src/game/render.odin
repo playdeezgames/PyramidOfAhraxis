@@ -237,40 +237,54 @@ resolve :: proc(f: ^Frame) {
 }
 
 draw_menu :: proc(f: ^Frame) {
-	cls(f, COLOR_BG)
-	center(f, "\xC9\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBB", 8, 9, 1)
-	center(f, "Pyramid of Ahraxis", 18, 9, 2)
-	center(f, "\xC8\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xCD\xBC", 36, 9, 1)
-	draw_gfx(f, .Player, 114, 52)
-	center(f, "S-Start", 74)
-	center(f, "I-Instructions", 86)
-	center(f, "A Production of", 104, 14)
-	center(f, "TheGrumpyGameDev", 112, 6)
-	center(f, "September 2023", 122, 14)
+	cls(f, COLOR_BLACK)
+	for i in 0 ..< SCREEN_W / TILE { // a wall of the pyramid above and below
+		draw_gfx_color(f, .Wall_Block, i * TILE, 0, 4)
+		draw_gfx_color(f, .Wall_Block, i * TILE, SCREEN_H - TILE, 4)
+	}
+	center(f, "Pyramid of Ahraxis", 20, 4, 2)
+	center(f, "A deathtrap in seven levels", 40, 13)
+	parade := [?]Gfx{.Player, .Sword, .Monster, .Wraith, .Trap, .Jool, .Merchant, .Brazier}
+	for g, i in parade {
+		draw_gfx(f, g, 24 + i * 24, 56)
+	}
+	center(f, "S-Start", 78, 12)
+	center(f, "I-Instructions", 90, 12)
+	center(f, "A Production of", 102, 14)
+	center(f, "TheGrumpyGameDev", 110, 6)
 }
 
-draw_help :: proc(f: ^Frame) {
+// Two pages: the pictures and controls, then the rules and credits.
+draw_help :: proc(f: ^Frame, g: ^Game) {
 	cls(f, COLOR_BG)
-	shadow(f, "Instructions", 0, 0, 9, 0, 2)
-	shadow(f, "Controls (in-game):", 0, 20, 3)
-	shadow(f, "Any key: Back", 120, 20, 12)
-	shadow(f, "Arrows: Move  F2: Reset  P: Potion", 0, 29)
-	shadow(f, "Pictures:", 0, 38, 3)
-	rows := [?]struct {
-		g:    Gfx,
-		name: string,
-	}{{.Player, "You"}, {.Key, "Key"}, {.Potion, "Potion"}, {.Shield, "Shield"}, {.Sword, "Sword"}}
-	more := [?]struct {
-		g:    Gfx,
-		name: string,
-	}{{.Jool, "JOOLS!!"}, {.Candle, "Light"}, {.Heart, "Health"}, {.Door, "Door"}, {.Trap, "Trap"}}
-	for r, i in rows {
-		draw_gfx(f, r.g, 0, 48 + i * 12)
-		shadow(f, r.name, 16, 50 + i * 12)
+	if g.help_page == 0 {
+		shadow(f, "Instructions", 0, 0, 9, 0, 2)
+		left := [?]struct {
+			g:    Gfx,
+			name: string,
+		}{{.Player, "You"}, {.Key, "Key"}, {.Potion, "Potion"}, {.Shield, "Shield"}, {.Sword, "Sword"}, {.Jool, "Jool"}, {.Candle, "Light"}}
+		right := [?]struct {
+			g:    Gfx,
+			name: string,
+		}{{.Heart, "Health"}, {.Door, "Door"}, {.Trap, "Trap"}, {.Kit, "Disarm kit"}, {.Merchant, "Merchant"}, {.Monster, "Monster"}, {.Wraith, "Wraith"}}
+		for r, i in left {
+			draw_gfx(f, r.g, 0, 20 + i * 13)
+			shadow(f, r.name, 16, 22 + i * 13)
+		}
+		for r, i in right {
+			draw_gfx(f, r.g, 120, 20 + i * 13)
+			shadow(f, r.name, 136, 22 + i * 13)
+		}
+		shadow(f, "Arrows: Move   P: Potion   F2: Reset", 0, 114, 3)
+		shadow(f, "Any key: Next", 0, 126, 14)
+		return
 	}
-	for r, i in more {
-		draw_gfx(f, r.g, 120, 48 + i * 12)
-		shadow(f, r.name, 136, 50 + i * 12)
+	shadow(f, "Rules", 0, 0, 9, 0, 2)
+	text := "Keys open doors; swords kill monsters; shields block a blow. Step away from a monster and it strikes. Wraiths hunt you. Your light burns a step at a time: in the dark you lose hearts. Walk into a merchant to buy with jools (keys 1-6). The amulet shows traps, a disarm kit defuses one."
+	lines: [10]string
+	n := wrap_lines(text, SCREEN_W / GLYPH_W - 1, lines[:])
+	for line, i in lines[:n] {
+		shadow(f, line, 0, 18 + i * 9)
 	}
 	shadow(f, "Art: Urizen by vurmux (CC0)", 0, 110, 13)
 	shadow(f, "Font: DINOBYTE by mby (CC BY 4.0)", 0, 118, 13)
@@ -408,7 +422,7 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 	case .Menu:
 		draw_menu(f)
 	case .Help:
-		draw_help(f)
+		draw_help(f, g)
 	case .Play:
 		draw_play(f, g)
 	case .Shop:

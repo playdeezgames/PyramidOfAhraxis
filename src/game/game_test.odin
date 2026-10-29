@@ -48,7 +48,9 @@ menu_flow :: proc(t: ^testing.T) {
 	testing.expect_value(t, g.phase, Phase.Menu)
 	command(&g, .Instructions)
 	testing.expect_value(t, g.phase, Phase.Help)
-	command(&g, .Right) // any key goes back
+	command(&g, .Right) // any key turns to the rules
+	testing.expect_value(t, g.phase, Phase.Help)
+	command(&g, .Right) // and then back
 	testing.expect_value(t, g.phase, Phase.Menu)
 	command(&g, .Start)
 	testing.expect_value(t, g.phase, Phase.Play)

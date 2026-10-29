@@ -109,6 +109,7 @@ Game :: struct {
 	mw, mh: int,
 	level:  int,
 	banner: bool, // show the level title until the first step
+	help_page: int, // 0 pictures, 1 rules
 	clock:  int, // frames since the game began; only drives the last-heart blink
 	fuel:   int, // steps of light left
 	lantern: bool, // the light is a lantern (bigger radius)
@@ -700,12 +701,17 @@ command :: proc(g: ^Game, cmd: Command) {
 		#partial switch cmd {
 		case .Instructions:
 			g.phase = .Help
+			g.help_page = 0
 		case .Start:
 			play(g, .Music_Start)
 			g.phase = .Play
 		}
 	case .Help:
-		g.phase = .Menu
+		if g.help_page == 0 {
+			g.help_page = 1
+		} else {
+			g.phase = .Menu
+		}
 	case .Play:
 		if !alive(g) {
 			return

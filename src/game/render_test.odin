@@ -44,6 +44,9 @@ dump_frames :: proc(t: ^testing.T) {
 		g.phase = .Help
 		draw_game(f, &g)
 		write_ppm(t, DUMP_HELP, f)
+		g.help_page = 1
+		draw_game(f, &g)
+		write_ppm(t, strings.concatenate({DUMP_HELP, ".2.ppm"}), f)
 	}
 	if DUMP_BANNER != "" {
 		g.phase = .Play
