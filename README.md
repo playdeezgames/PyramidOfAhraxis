@@ -1,39 +1,23 @@
-# PyramidOfAhraxis
+# Pyramid of Ahraxis
 
-> The log, TODOs, commands and inventory below describe the 2023 COBOL text adventure (`old/`). The game in this repo's root is the TIC-80 cart `pyramid.tic`, being ported to Odin/wasm; see `CLAUDE.md`.
+Walk the tomb one step at a time: find **keys** to open doors, **potions** to heal, **shields** to turn a monster's blow aside, **swords** to kill monsters and **jools** for the score. Some floor tiles are traps. Reach the exit to see how you did.
 
-https://watabou.github.io/one-page-dungeon/?seed=1653868650
+**Play it:** https://playdeezgames.github.io/PyramidOfAhraxis/ (also on itch.io: https://thegrumpygamedev.itch.io/pyramid-of-ahraxis)
 
-## Log:
+**Controls:** S starts, I shows the instructions. Arrow keys move (hold to keep walking), P drinks a potion, F2 resets. Swipe to move on a touch screen.
 
-XY - Interactive Fiction Game Jam #ifgamejam
+## What is here
 
-* 02: 20230103
-    * 
-* 01: 20230102
-    * Got boilerplate up and running
-    * Got basic navigation (other than the cosmetics) roughed in
+The game began as the TIC-80 cart `pyramid.tic` (September 2023). In October 2026 it was reverse engineered and ported to Odin compiled to WebAssembly (`js_wasm32`), keeping the original's rules and map. The pictures were redrawn with the Urizen tileset, the text uses the DINOBYTE font, and the sounds were made with the Anvil of SPLORR!!. The port was made with Claude Code (generative AI) working alongside TheGrumpyGameDev.
 
-## TODOs
+- `src/game`: pure rules, software renderer and generated asset data (no browser imports).
+- `src/web`: thin wasm exports. `web/index.html` owns the frame loop, input and audio.
+- `tools/test.sh`: native tests and `odin check` for wasm. `tools/build.sh [--size]` builds `build/web`. `tools/pages.sh` refreshes `docs/` (GitHub Pages). `tools/ship.sh` makes the itch.io zip.
+- `old/`: an earlier, unrelated GNU COBOL text adventure of the same name (January 2023).
 
-* Room 2 Coffin
-* Room 4 Dais with Coffin
-* Room 4 to Room 16 Portcullis
-* Room 7 Crate
-* Room 7 Puddle
-* Room 15 Puddle
+## Credits
 
-## Commands:
-
-* C = Character
-* E = East
-* I = Inventory
-* M = Menu
-* N = North
-* S = South
-* W = West
-
-## Inventory:
-
-* S = Shield
-* X = leave inventory
+- Urizen 1-bit tileset by vurmux, https://vurmux.itch.io/urizen-onebit-tileset (CC0).
+- DINOBYTE bitmap font by mby, https://mby.itch.io/dinobyte (CC BY 4.0, used unmodified).
+- Sounds made with the Anvil of SPLORR!!.
+- Original cart made in TIC-80.

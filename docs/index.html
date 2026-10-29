@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pyramid of Ahraxis</title>
+<style>
+	html, body { margin: 0; height: 100%; background: #1a1c2c; overflow: hidden; }
+	body { display: flex; align-items: center; justify-content: center; }
+	canvas {
+		image-rendering: pixelated;
+		width: min(100vw, calc(100vh * 240 / 136));
+		height: min(100vh, calc(100vw * 136 / 240));
+		touch-action: none;
+	}
+</style>
+</head>
+<body>
+<canvas id="screen" width="240" height="136"></canvas>
+<script src="odin.js"></script>
+<script>
+(async function () {
+	const W = 240, H = 136;
+	const canvas = document.getElementById("screen");
+	const ctx = canvas.getContext("2d");
+	const memory = new odin.WasmMemoryInterface();
+	await odin.runWasm("game.wasm", null, {}, memory);
+	const ex = memory.exports;
+
+	// Sound effects and stingers from the Anvil (assets/pyramid.world.json), in game.Sound order
+	// (id 1 is the first file). The context is made now and decodes straight away; browsers keep
+	// it suspended until the first key or tap.
+	const SOUND_FILES = [
+		"bump", "key", "door", "sword_kill", "shield_block", "monster_hit", "trap",
+		"music_death", "music_shield", "music_start", "music_sword", "music_jool", "music_potion",
+		"music_quaff", "music_exit",
+	];
+	const SOUND_GAIN = [0.12, 0.2, 0.15, 0.2, 0.2, 0.2, 0.2, 0.25, 0.2, 0.2, 0.2, 0.2, 0.2, 0.2, 0.25];
+	let audio = null;
+	const buffers = [];
+	try {
+		audio = new (window.AudioContext || window.webkitAudioContext)();
+		SOUND_FILES.forEach((name, i) => {
+			fetch("sfx/" + name + ".wav")
+				.then((r) => r.arrayBuffer())
+				.then((data) => audio.decodeAudioData(data))
+				.then((buffer) => { buffers[i] = buffer; })
+				.catch(() => {});
+		});
+	} catch (e) { audio = null; }
+	function unlock() { if (audio && audio.state === "suspended") audio.resume(); }
+	function play(id) {
+		const buffer = buffers[id - 1];
+		if (!audio || !buffer) return;
+		const source = audio.createBufferSource(), gain = audio.createGain();
+		source.buffer = buffer;
+		gain.gain.value = SOUND_GAIN[id - 1];
+		source.connect(gain).connect(audio.destination);
+		source.start();
+	}
+	function command(c) {
+		ex.platform_command(c);
+		for (let id = ex.platform_take_sound(); id; id = ex.platform_take_sound()) play(id);
+	}
+
+	// game.Command order: Up Down Left Right Quaff Start Instructions Back Reset.
+	// TIC-80 cart: arrows move with keyp(code, 10, 10) (repeat after 10 frames, then every 10),
+	// P quaffs a potion, S starts, I opens help, any key leaves help, F2 resets. F4 (exit) is not offered.
+	const KEYS = { ArrowUp: 0, ArrowDown: 1, ArrowLeft: 2, ArrowRight: 3, KeyP: 4, KeyS: 5, KeyI: 6, F2: 8 };
+	const REPEATS = new Set([0, 1, 2, 3]);
+	let held = null; // { code, command, frames }
+	window.addEventListener("keydown", (e) => {
+		if (e.repeat) { e.preventDefault(); return; }
+		unlock();
+		const c = e.code in KEYS ? KEYS[e.code] : 7;
+		if (e.code in KEYS || e.code.startsWith("Key") || e.code === "Space" || e.code === "Enter") e.preventDefault();
+		command(c);
+		if (REPEATS.has(c)) held = { code: e.code, command: c, frames: 0 };
+	});
+	window.addEventListener("keyup", (e) => { if (held && held.code === e.code) held = null; });
+	window.addEventListener("blur", () => { held = null; });
+
+	// Touch: swipe to move, tap to start / go back.
+	let touch = null;
+	canvas.addEventListener("pointerdown", (e) => { unlock(); touch = { x: e.clientX, y: e.clientY }; });
+	canvas.addEventListener("pointerup", (e) => {
+		if (!touch) return;
+		const dx = e.clientX - touch.x, dy = e.clientY - touch.y;
+		touch = null;
+		if (Math.max(Math.abs(dx), Math.abs(dy)) < 24) { command(5); command(7); return; }
+		command(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 3 : 2) : (dy > 0 ? 1 : 0));
+	});
+
+	const image = ctx.createImageData(W, H);
+	function frame() {
+		if (held && ++held.frames >= 10) { held.frames = 0; command(held.command); }
+		if (ex.platform_frame()) {
+			// Read the buffer after the call: wasm memory may have grown.
+			image.data.set(new Uint8Array(memory.memory.buffer, ex.platform_frame_ptr(), W * H * 4));
+			ctx.putImageData(image, 0, 0);
+		}
+		requestAnimationFrame(frame);
+	}
+	requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
