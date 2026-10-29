@@ -398,8 +398,8 @@ strike :: proc(g: ^Game, ox, oy: int) -> bool {
 	return false
 }
 
-// Mv(dx, dy). Faithful quirk: a sword kill still lets the same bump resolve the
-// shield/health branch, so the monster hits back on the turn it dies.
+// Mv(dx, dy). Changed from the cart: a sword kills a monster cleanly. (In the cart the same bump
+// went on to the shield/health branch, so the monster also hit back on the turn it died.)
 @(private)
 move :: proc(g: ^Game, dx, dy: int) {
 	nx, ny := g.x + dx, g.y + dy
@@ -421,8 +421,9 @@ move :: proc(g: ^Game, dx, dy: int) {
 				g.as -= 1
 				g.ms += 1
 				mset(g, nx, ny, 0)
+			} else {
+				monster_hits(g, "Ouch! -1 health")
 			}
-			monster_hits(g, "Ouch! -1 health")
 		} else {
 			play(g, .Bump)
 			if locks > 1 {

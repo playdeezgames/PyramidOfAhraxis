@@ -130,16 +130,17 @@ monster_shield_blocks :: proc(t: ^testing.T) {
 }
 
 @(test)
-monster_sword_kills_but_still_hits_back :: proc(t: ^testing.T) {
-	// Original quirk: the shield/health branch runs after a sword kill too.
+monster_sword_kills_cleanly :: proc(t: ^testing.T) {
+	// The cart let the monster hit back on the turn it died; here a kill costs nothing.
 	g := fresh()
-	g.as = 1
+	g.as, g.ds = 1, 1
 	put_right(&g, TILE_MONSTER)
 	command(&g, .Right)
 	testing.expect_value(t, g.ms, 1)
 	testing.expect_value(t, g.as, 0)
 	testing.expect_value(t, mget(&g, 22, 11), u8(0))
-	testing.expect_value(t, g.h, 2)
+	testing.expect_value(t, g.h, 3)
+	testing.expect_value(t, g.ds, 1) // the shield was not needed
 }
 
 @(test)
@@ -231,12 +232,11 @@ pickup_floats_a_message_that_expires :: proc(t: ^testing.T) {
 
 @(test)
 messages_of_one_turn_stack :: proc(t: ^testing.T) {
-	g := fresh()
-	g.as = 1
-	put_right(&g, TILE_MONSTER)
-	command(&g, .Right) // the sword kills it, and the quirk lets it hit back
-	testing.expect_value(t, string(g.floats[0].text[:g.floats[0].n]), "Monster slain")
-	testing.expect_value(t, string(g.floats[1].text[:g.floats[1].n]), "Ouch! -1 health")
+	g := beside_monster()
+	mset(&g, g.x, g.y + 1, TILE_KEY)
+	command(&g, .Down) // stepping away from the monster and onto a key
+	testing.expect_value(t, string(g.floats[0].text[:g.floats[0].n]), "Monster strikes!")
+	testing.expect_value(t, string(g.floats[1].text[:g.floats[1].n]), "+1 key")
 	testing.expect_value(t, g.floats[1].lift, FLOAT_STACK)
 }
 
@@ -523,8 +523,9 @@ a_shield_turns_the_blow_aside :: proc(t: ^testing.T) {
 killing_the_monster_first_means_no_strike_after :: proc(t: ^testing.T) {
 	g := beside_monster()
 	g.as, g.ds = 1, 1
-	command(&g, .Up) // bump: the sword kills it (the shield takes the old quirk's hit)
+	command(&g, .Up) // bump: the sword kills it, and nothing hits back
 	testing.expect_value(t, g.ms, 1)
+	testing.expect_value(t, g.ds, 1)
 	testing.expect_value(t, mget(&g, 21, 10), u8(0))
 	h := g.h
 	command(&g, .Down)
