@@ -676,3 +676,15 @@ fuel_carries_over_and_each_level_adds_some :: proc(t: ^testing.T) {
 	testing.expect_value(t, g.fuel, FUEL_MAX)
 	testing.expect(t, !g.seen[0] || true)
 }
+
+@(test)
+last_heart_blinks :: proc(t: ^testing.T) {
+	g: Game
+	init_game(&g)
+	g.phase = .Play
+	g.h = 1
+	testing.expect(t, tick(&g), "a lone heart keeps the page redrawing")
+	g.h = 2
+	g.floats = {}
+	testing.expect(t, !tick(&g), "two hearts do not blink")
+}

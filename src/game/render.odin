@@ -344,7 +344,8 @@ draw_play :: proc(f: ^Frame, g: ^Game) {
 		draw_banner(f, g)
 	}
 	for i in 0 ..< START_HEALTH {
-		draw_gfx(f, g.h > i ? .Heart : .Heart_Empty, HUD_X + i * TILE, 0)
+		beat := last_heart(g) && i == 0 && g.clock / 15 % 2 == 1 // last heart blinks about twice a second
+		draw_gfx(f, g.h > i && !beat ? .Heart : .Heart_Empty, HUD_X + i * TILE, 0)
 	}
 	hud_row(f, .Key, g.ks, 1)
 	hud_row(f, .Potion, g.ps, 2)

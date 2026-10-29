@@ -95,6 +95,7 @@ Game :: struct {
 	mw, mh: int,
 	level:  int,
 	banner: bool, // show the level title until the first step
+	clock:  int, // frames since the game began; only drives the last-heart blink
 	fuel:   int, // steps of light left
 	lantern: bool, // the light is a lantern (bigger radius)
 	dark:   int, // steps taken with no light
@@ -149,7 +150,8 @@ say :: proc(g: ^Game, text: string, color: u8 = 12) {
 
 // One frame of drift; reports whether any message is still showing, so the page keeps redrawing.
 tick :: proc(g: ^Game) -> bool {
-	any_left := false
+	g.clock += 1
+	any_left := last_heart(g)
 	for &f in g.floats {
 		if f.n == 0 {
 			continue
@@ -335,6 +337,11 @@ is_solid :: proc(c: u8) -> bool {
 
 fget :: proc(tile: u8, flag: uint) -> bool {
 	return FLAGS[tile] & (1 << flag) != 0
+}
+
+// One hit point left in play: the last heart blinks.
+last_heart :: proc(g: ^Game) -> bool {
+	return g.phase == .Play && g.h == 1
 }
 
 alive :: proc(g: ^Game) -> bool {
