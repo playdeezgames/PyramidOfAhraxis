@@ -49,6 +49,7 @@ tile_gfx :: proc(id: int) -> (g: Gfx, ok: bool) {
 	case 1: return .Wall, true
 	case 2: return .Door, true
 	case 3: return .Door_Window, true
+	case 4, 5: return .Door_Window, true // gates with two and three locks
 	case 8: return .Exit, true
 	case 41: return .Trap, true
 	case 66: return .Monster, true
@@ -96,8 +97,13 @@ draw_map :: proc(f: ^Frame, g: ^Game, cx, cy: int) {
 					set_px(f, x + xx, y + yy, COLOR_BLACK)
 				}
 			}
-			if gfx, ok := tile_gfx(int(mget(g, cx + i, cy + j))); ok {
+			t := mget(g, cx + i, cy + j)
+			if gfx, ok := tile_gfx(int(t)); ok {
 				draw_gfx(f, gfx, x, y)
+			}
+			if n := locks_of(t); n > 1 { // a gate that takes several keys shows how many
+				digit := [1]u8{u8('0' + n)}
+				shadow(f, string(digit[:]), x + (TILE - GLYPH_W) / 2, y + (TILE - GLYPH_H) / 2, 4)
 			}
 		}
 	}
@@ -163,6 +169,7 @@ draw_help :: proc(f: ^Frame) {
 	cls(f, COLOR_BG)
 	shadow(f, "Instructions", 0, 0, 9, 0, 2)
 	shadow(f, "Controls (in-game):", 0, 20, 3)
+	shadow(f, "Any key: Back", 120, 20, 12)
 	shadow(f, "Arrows: Move  F2: Reset  P: Potion", 0, 29)
 	shadow(f, "Pictures:", 0, 38, 3)
 	rows := [?]struct {
@@ -181,9 +188,9 @@ draw_help :: proc(f: ^Frame) {
 		draw_gfx(f, r.g, 120, 48 + i * 12)
 		shadow(f, r.name, 136, 50 + i * 12)
 	}
-	shadow(f, "Art: Urizen by vurmux (CC0)", 0, 111, 13)
-	shadow(f, "Font: DINOBYTE by mby (CC BY 4.0)", 0, 119, 13)
-	shadow(f, "Press Any Key to go Back", 0, 128, 12)
+	shadow(f, "Art: Urizen by vurmux (CC0)", 0, 110, 13)
+	shadow(f, "Font: DINOBYTE by mby (CC BY 4.0)", 0, 118, 13)
+	shadow(f, "Maps: One Page Dungeon by Watabou", 0, 126, 13)
 }
 
 // Floating messages: centred on their cell, rising one pixel every three frames, blinking out.
@@ -209,11 +216,60 @@ hud_row :: proc(f: ^Frame, g: Gfx, n: int, row: int, color: u8 = 12) {
 	print(f, num_text(buf[:], "x", n), HUD_X + 16, y + 2, color)
 }
 
+fill_rect :: proc(f: ^Frame, x, y, w, h: int, c: u8) {
+	for j in 0 ..< h {
+		for i in 0 ..< w {
+			set_px(f, x + i, y + j, c)
+		}
+	}
+}
+
+// Breaks text into lines of at most width glyphs at spaces; the lines alias text.
+wrap_lines :: proc(text: string, width: int, out: []string) -> int {
+	n, start := 0, 0
+	for start < len(text) && n < len(out) {
+		end := min(start + width, len(text))
+		if end < len(text) {
+			e := end
+			for e > start && text[e] != ' ' {
+				e -= 1
+			}
+			if e > start {
+				end = e
+			}
+		}
+		out[n] = text[start:end]
+		n += 1
+		start = end
+		for start < len(text) && text[start] == ' ' {
+			start += 1
+		}
+	}
+	return n
+}
+
+// The level's name and hint over the top of the play window, until the first step.
+draw_banner :: proc(f: ^Frame, g: ^Game) {
+	lv := LEVELS[g.level]
+	lines: [4]string
+	n := wrap_lines(lv.hint, VIEW_W * TILE / GLYPH_W - 2, lines[:])
+	h := 6 + 11 + n * 9 + 2
+	fill_rect(f, 0, VIEW_Y, VIEW_W * TILE, h, COLOR_BLACK)
+	title_x := (VIEW_W * TILE - text_width(lv.title)) / 2
+	shadow(f, lv.title, max(title_x, 0), VIEW_Y + 5, 4)
+	for line, i in lines[:n] {
+		shadow(f, line, 6, VIEW_Y + 5 + 12 + i * 9)
+	}
+}
+
 draw_play :: proc(f: ^Frame, g: ^Game) {
 	cls(f, COLOR_BG)
 	draw_map(f, g, g.x - VIEW_W / 2, g.y - VIEW_H / 2)
 	draw_gfx(f, alive(g) ? .Player : .Dead, (VIEW_W / 2) * TILE, VIEW_Y + (VIEW_H / 2) * TILE)
 	draw_floaters(f, g)
+	if g.banner {
+		draw_banner(f, g)
+	}
 	for i in 0 ..< START_HEALTH {
 		draw_gfx(f, g.h > i ? .Heart : .Heart_Empty, HUD_X + i * TILE, 0)
 	}
@@ -225,6 +281,10 @@ draw_play :: proc(f: ^Frame, g: ^Game) {
 	if mget(g, g.x, g.y) == TRAP_SPRUNG {
 		print(f, "TRAP!", HUD_X, 86, 12)
 	}
+	a, b: [12]u8
+	at := num_text(a[:], "Lv ", g.level + 1)
+	shadow(f, at, HUD_X, 94, 13)
+	shadow(f, num_text(b[:], "/", len(LEVELS)), HUD_X + text_width(at), 94, 13)
 	shadow(f, "Move:\x18\x19\x1B\x1A", HUD_X, 104)
 	shadow(f, "P:Potion", HUD_X, 112)
 	shadow(f, "F2:Reset", HUD_X, 120)

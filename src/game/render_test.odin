@@ -2,6 +2,7 @@
 package game
 
 import "core:os"
+import "core:strings"
 import "core:testing"
 
 // Not a real test: `odin test src/game -define:DUMP_MENU=a.ppm` (also DUMP_PLAY, DUMP_HELP,
@@ -10,6 +11,7 @@ DUMP_MENU :: #config(DUMP_MENU, "")
 DUMP_PLAY :: #config(DUMP_PLAY, "")
 DUMP_HELP :: #config(DUMP_HELP, "")
 DUMP_SCORE :: #config(DUMP_SCORE, "")
+DUMP_LEVELS :: #config(DUMP_LEVELS, "") // path prefix: writes <prefix>0.ppm, <prefix>1.ppm ... one per level
 
 write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
 	resolve(f)
@@ -24,7 +26,7 @@ write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
 
 @(test)
 dump_frames :: proc(t: ^testing.T) {
-	if DUMP_MENU == "" && DUMP_PLAY == "" && DUMP_HELP == "" && DUMP_SCORE == "" {
+	if DUMP_MENU == "" && DUMP_PLAY == "" && DUMP_HELP == "" && DUMP_SCORE == "" && DUMP_LEVELS == "" {
 		return
 	}
 	f := new(Frame)
@@ -44,6 +46,17 @@ dump_frames :: proc(t: ^testing.T) {
 		g.phase = .Play
 		draw_game(f, &g)
 		write_ppm(t, DUMP_PLAY, f)
+	}
+	if DUMP_LEVELS != "" {
+		g.phase = .Play
+		for n in 0 ..< len(LEVELS) {
+			load_level(&g, n)
+			draw_game(f, &g)
+			buf: [256]u8
+			path := strings.concatenate({num_text(buf[:], DUMP_LEVELS, n), ".ppm"})
+			write_ppm(t, path, f)
+			delete(path)
+		}
 	}
 	if DUMP_SCORE != "" {
 		g.phase = .Score

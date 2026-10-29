@@ -1,6 +1,6 @@
 # Pyramid of Ahraxis
 
-Walk the tomb one step at a time: find **keys** to open doors, **potions** to heal, **shields** to turn a monster's blow aside, **swords** to kill monsters and **jools** for the score. Some floor tiles are traps. Reach the exit to see how you did.
+Walk the tomb one step at a time: find **keys** to open doors, **potions** to heal, **shields** to turn a monster's blow aside, **swords** to kill monsters and **jools** for the score. Some floor tiles are traps. Seven levels (a tutorial, five dungeons from One Page Dungeon seeds, then the original map): reach each exit to go on, and the last one shows how you did. Gates can take several keys.
 
 **Play it:** https://playdeezgames.github.io/PyramidOfAhraxis/ (also on itch.io: https://thegrumpygamedev.itch.io/pyramid-of-ahraxis)
 
@@ -19,5 +19,6 @@ The game began as the TIC-80 cart `pyramid.tic` (September 2023). In October 202
 
 - Urizen 1-bit tileset by vurmux, https://vurmux.itch.io/urizen-onebit-tileset (CC0).
 - DINOBYTE bitmap font by mby, https://mby.itch.io/dinobyte (CC BY 4.0, used unmodified).
+- Dungeon layouts from One Page Dungeon by Watabou, https://watabou.itch.io/one-page-dungeon (generated images may be used freely; credited here anyway).
 - Sounds made with the Anvil of SPLORR!!.
 - Original cart made in TIC-80.

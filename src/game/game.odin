@@ -1,7 +1,9 @@
 package game
 
 // Pure rules of the TIC-80 cart (Mv, Qf, Score and the Menu/Help/Play/Score
-// screens), ported faithfully from its Lua. No browser imports, no clock, no RNG.
+// screens), ported faithfully from its Lua, plus a sequence of levels: dungeons made from
+// Watabou's One Page Dungeon seeds (levels.odin) and then the cart's own map. No browser
+// imports, no clock, no RNG.
 
 Phase :: enum {
 	Menu,
@@ -41,12 +43,14 @@ Sound :: enum {
 	Music_Exit, // music 7
 }
 
-START_X :: 21
-START_Y :: 11
 START_HEALTH :: 3
 TRAP_SPRUNG :: 41
 
 // Tile ids that carry behaviour (see CLAUDE.md).
+TILE_DOOR :: 2 // one lock
+TILE_GATE1 :: 3 // one lock
+TILE_GATE2 :: 4 // two locks (generated levels only)
+TILE_GATE3 :: 5 // three locks (generated levels only)
 TILE_EXIT :: 8
 TILE_TRAP :: 9
 TILE_MONSTER :: 66
@@ -59,9 +63,23 @@ TILE_SWORD :: 132
 FLAG_DOOR :: 6
 FLAG_SOLID :: 7
 
+// A level: a grid of tile ids (row-major, w by h) and where the player starts.
+Level :: struct {
+	title:            string,
+	hint:             string,
+	w, h:             int,
+	start_x, start_y: int,
+	tiles:            []u8,
+}
+
+CART_LEVEL :: len(LEVELS) - 1 // the last level is the cart's own map
+
 Game :: struct {
 	phase:  Phase,
-	map_:   [MAP_W * MAP_H]u8,
+	map_:   [MAP_W * MAP_H]u8, // the current level, stride mw
+	mw, mh: int,
+	level:  int,
+	banner: bool, // show the level title until the first step
 	x, y:   int,
 	h:      int, // health
 	ks:     int, // keys
@@ -128,25 +146,60 @@ tick :: proc(g: ^Game) -> bool {
 
 init_game :: proc(g: ^Game) {
 	g^ = {}
-	g.map_ = MAP_INITIAL
-	g.x, g.y = START_X, START_Y
 	g.h = START_HEALTH
 	g.phase = .Menu
+	load_level(g, 0)
+}
+
+// Loads a level's map and puts the player on its start; health and items carry over.
+load_level :: proc(g: ^Game, n: int) {
+	lv := LEVELS[n]
+	g.level = n
+	g.mw, g.mh = lv.w, lv.h
+	g.map_ = {}
+	copy(g.map_[:], lv.tiles)
+	g.x, g.y = lv.start_x, lv.start_y
+	g.floats = {}
+	g.banner = true
 }
 
 // mget: cells outside the map read as 0.
 mget :: proc(g: ^Game, x, y: int) -> u8 {
-	if x < 0 || y < 0 || x >= MAP_W || y >= MAP_H {
+	if x < 0 || y < 0 || x >= g.mw || y >= g.mh {
 		return 0
 	}
-	return g.map_[y * MAP_W + x]
+	return g.map_[y * g.mw + x]
 }
 
 mset :: proc(g: ^Game, x, y: int, t: u8) {
-	if x < 0 || y < 0 || x >= MAP_W || y >= MAP_H {
+	if x < 0 || y < 0 || x >= g.mw || y >= g.mh {
 		return
 	}
-	g.map_[y * MAP_W + x] = t
+	g.map_[y * g.mw + x] = t
+}
+
+// Keys a locked tile still wants (0 = not a lock). Tiles 2 and 3 are the cart's doors.
+locks_of :: proc(c: u8) -> int {
+	switch c {
+	case TILE_DOOR, TILE_GATE1: return 1
+	case TILE_GATE2: return 2
+	case TILE_GATE3: return 3
+	}
+	return 0
+}
+
+// The tile left when one lock of a gate is opened (1 lock -> open floor).
+@(private)
+fewer_locks :: proc(locks: int) -> u8 {
+	switch locks {
+	case 2: return TILE_GATE1
+	case 3: return TILE_GATE2
+	}
+	return 0
+}
+
+is_solid :: proc(c: u8) -> bool {
+	return fget(c, FLAG_SOLID) || locks_of(c) > 0
 }
 
 fget :: proc(tile: u8, flag: uint) -> bool {
@@ -183,12 +236,16 @@ score :: proc(g: ^Game) -> int {
 move :: proc(g: ^Game, dx, dy: int) {
 	nx, ny := g.x + dx, g.y + dy
 	c := mget(g, nx, ny)
-	if fget(c, FLAG_SOLID) {
-		if fget(c, FLAG_DOOR) && g.ks > 0 {
+	if is_solid(c) {
+		if locks := locks_of(c); locks > 0 && g.ks > 0 {
 			play(g, .Door)
-			say(g, "Door unlocked", 4)
-			mset(g, nx, ny, 0)
 			g.ks -= 1
+			if locks > 1 {
+				say(g, "Lock opened", 4)
+			} else {
+				say(g, "Door unlocked", 4)
+			}
+			mset(g, nx, ny, fewer_locks(locks))
 		} else if c == TILE_MONSTER {
 			if g.as > 0 {
 				play(g, .Sword_Kill)
@@ -213,7 +270,10 @@ move :: proc(g: ^Game, dx, dy: int) {
 			}
 		} else {
 			play(g, .Bump)
-			if fget(c, FLAG_DOOR) {
+			if locks > 1 {
+				buf: [16]u8
+				say(g, num_text(buf[:], "Needs keys: ", locks), 12)
+			} else if locks == 1 {
 				say(g, "Need a key", 12)
 			}
 		}
@@ -223,7 +283,11 @@ move :: proc(g: ^Game, dx, dy: int) {
 	switch c {
 	case TILE_EXIT:
 		play(g, .Music_Exit)
-		g.phase = .Score
+		if g.level + 1 < len(LEVELS) {
+			load_level(g, g.level + 1)
+		} else {
+			g.phase = .Score
+		}
 	case TILE_KEY:
 		play(g, .Key)
 		say(g, "+1 key", 4)
@@ -298,12 +362,16 @@ command :: proc(g: ^Game, cmd: Command) {
 		}
 		#partial switch cmd {
 		case .Up:
+			g.banner = false
 			move(g, 0, -1)
 		case .Down:
+			g.banner = false
 			move(g, 0, 1)
 		case .Left:
+			g.banner = false
 			move(g, -1, 0)
 		case .Right:
+			g.banner = false
 			move(g, 1, 0)
 		case .Quaff:
 			quaff(g)
