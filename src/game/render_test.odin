@@ -11,6 +11,8 @@ DUMP_MENU :: #config(DUMP_MENU, "")
 DUMP_PLAY :: #config(DUMP_PLAY, "")
 DUMP_HELP :: #config(DUMP_HELP, "")
 DUMP_SCORE :: #config(DUMP_SCORE, "")
+DUMP_BANNER :: #config(DUMP_BANNER, "") // level 1 with its title banner
+DUMP_PLAY_LEVEL :: #config(DUMP_PLAY_LEVEL, 0) // which level DUMP_PLAY shows (no banner)
 DUMP_LEVELS :: #config(DUMP_LEVELS, "") // path prefix: writes <prefix>0.ppm, <prefix>1.ppm ... one per level
 
 write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
@@ -26,7 +28,7 @@ write_ppm :: proc(t: ^testing.T, path: string, f: ^Frame) {
 
 @(test)
 dump_frames :: proc(t: ^testing.T) {
-	if DUMP_MENU == "" && DUMP_PLAY == "" && DUMP_HELP == "" && DUMP_SCORE == "" && DUMP_LEVELS == "" {
+	if DUMP_MENU == "" && DUMP_PLAY == "" && DUMP_HELP == "" && DUMP_SCORE == "" && DUMP_LEVELS == "" && DUMP_BANNER == "" {
 		return
 	}
 	f := new(Frame)
@@ -42,8 +44,15 @@ dump_frames :: proc(t: ^testing.T) {
 		draw_game(f, &g)
 		write_ppm(t, DUMP_HELP, f)
 	}
+	if DUMP_BANNER != "" {
+		g.phase = .Play
+		draw_game(f, &g)
+		write_ppm(t, DUMP_BANNER, f)
+	}
 	if DUMP_PLAY != "" {
 		g.phase = .Play
+		load_level(&g, DUMP_PLAY_LEVEL)
+		g.banner = false
 		draw_game(f, &g)
 		write_ppm(t, DUMP_PLAY, f)
 	}

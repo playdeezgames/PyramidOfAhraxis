@@ -6,8 +6,11 @@ from PIL import Image
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 d = sys.argv[1]
 frame = lambda n: Image.open(os.path.join(d, n + '.ppm')).convert('RGB')
-os.makedirs(os.path.join(ROOT, 'assets/screenshots'), exist_ok=True)
-for i, n in enumerate(['menu', 'play', 'help', 'score'], 1):
+shots = os.path.join(ROOT, 'assets/screenshots')
+os.makedirs(shots, exist_ok=True)
+for old in os.listdir(shots):
+    os.remove(os.path.join(shots, old))
+for i, n in enumerate(['menu', 'banner', 'play', 'help', 'score'], 1):
     frame(n).resize((960, 544), Image.NEAREST).save(os.path.join(ROOT, f'assets/screenshots/0{i}-{n}.png'))
 # Cover: the title screen at 2x over a strip of the dungeon at 2x, integer scaling only.
 cover = Image.new('RGB', (630, 500), (26, 28, 44))
