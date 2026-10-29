@@ -9,6 +9,7 @@ Phase :: enum {
 	Menu,
 	Help,
 	Play,
+	Shop, // bumped into a merchant: spend jools
 	Score,
 }
 
@@ -22,6 +23,12 @@ Command :: enum {
 	Instructions, // menu: I
 	Back, // help: any key
 	Reset, // F2
+	Choose_1, // shop: buy the numbered item (keys 1 to 6)
+	Choose_2,
+	Choose_3,
+	Choose_4,
+	Choose_5,
+	Choose_6,
 }
 
 // One entry per sfx()/music() call of the Lua. The page maps these to audio.
@@ -52,9 +59,12 @@ TILE_GATE1 :: 3 // one lock
 TILE_GATE2 :: 4 // two locks (generated levels only)
 TILE_GATE3 :: 5 // three locks (generated levels only)
 TILE_BRAZIER :: 6 // a fixed light; solid
+TILE_MERCHANT :: 7 // trades jools for goods; solid
 TILE_EXIT :: 8
 TILE_TRAP :: 9
-TILE_MONSTER :: 66
+TILE_TRAP_SEEN :: 10 // a trap you have sensed; a disarm kit can defuse it
+TILE_MONSTER :: 66 // stands guard
+TILE_WRAITH :: 67 // hunts you when it sees you
 TILE_KEY :: 128
 TILE_POTION :: 129
 TILE_JOOL :: 130
@@ -62,6 +72,10 @@ TILE_SHIELD :: 131
 TILE_SWORD :: 132
 TILE_TORCH :: 133 // pickup: light for a while
 TILE_LANTERN :: 134 // pickup: a bigger light, and light for longer
+TILE_KIT :: 135 // pickup: a disarm kit
+
+SENSE_RADIUS :: 2 // how far the trap amulet feels, in cells
+CHASE_RANGE :: 7 // how far a wraith sees you
 
 // Light: the player's light burns one unit of fuel per step and is the clock of the dungeon.
 TORCH_FUEL :: 60
@@ -109,6 +123,11 @@ Game :: struct {
 	ds:     int, // shields
 	as:     int, // swords
 	ms:     int, // kills
+	ts:     int, // disarm kits
+	sense:  bool, // owns the trap amulet
+	turns:  int, // steps taken; wraiths rest every third one
+	rng:    u32,
+	note:   string, // the merchant's last remark
 	sounds: [8]Sound,
 	nsound: int,
 	floats: [8]Floater,
@@ -170,6 +189,7 @@ init_game :: proc(g: ^Game) {
 	g^ = {}
 	g.h = START_HEALTH
 	g.phase = .Menu
+	g.rng = 20261029
 	load_level(g, 0)
 }
 
@@ -260,6 +280,27 @@ see :: proc(g: ^Game) {
 			g.seen[i] = true
 		}
 	}
+	if g.sense {
+		spot_traps(g)
+	}
+}
+
+// The trap amulet: hidden traps within SENSE_RADIUS show themselves.
+@(private)
+spot_traps :: proc(g: ^Game) {
+	found := false
+	for y in g.y - SENSE_RADIUS ..= g.y + SENSE_RADIUS {
+		for x in g.x - SENSE_RADIUS ..= g.x + SENSE_RADIUS {
+			if mget(g, x, y) == TILE_TRAP {
+				mset(g, x, y, TILE_TRAP_SEEN)
+				g.seen[y * g.mw + x] = true
+				found = true
+			}
+		}
+	}
+	if found {
+		say(g, "Trap sensed", 4)
+	}
 }
 
 // True when the cell is lit right now (off the map is never lit).
@@ -332,7 +373,11 @@ fewer_locks :: proc(locks: int) -> u8 {
 }
 
 is_solid :: proc(c: u8) -> bool {
-	return fget(c, FLAG_SOLID) || locks_of(c) > 0 || c == TILE_BRAZIER
+	return fget(c, FLAG_SOLID) || locks_of(c) > 0 || c == TILE_BRAZIER || c == TILE_MERCHANT || c == TILE_WRAITH
+}
+
+is_monster :: proc(c: u8) -> bool {
+	return c == TILE_MONSTER || c == TILE_WRAITH
 }
 
 fget :: proc(tile: u8, flag: uint) -> bool {
@@ -394,7 +439,7 @@ monster_hits :: proc(g: ^Game, text: string) {
 strike :: proc(g: ^Game, ox, oy: int) -> bool {
 	for d in ([4][2]int{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
 		mx, my := ox + d[0], oy + d[1]
-		if mget(g, mx, my) != TILE_MONSTER || abs(mx - g.x) + abs(my - g.y) == 1 {
+		if !is_monster(mget(g, mx, my)) || abs(mx - g.x) + abs(my - g.y) == 1 {
 			continue
 		}
 		monster_hits(g, "Monster strikes!")
@@ -409,6 +454,7 @@ strike :: proc(g: ^Game, ox, oy: int) -> bool {
 // went on to the shield/health branch, so the monster also hit back on the turn it died.)
 @(private)
 move :: proc(g: ^Game, dx, dy: int) {
+	level := g.level
 	nx, ny := g.x + dx, g.y + dy
 	c := mget(g, nx, ny)
 	if is_solid(c) {
@@ -421,7 +467,10 @@ move :: proc(g: ^Game, dx, dy: int) {
 				say(g, "Door unlocked", 4)
 			}
 			mset(g, nx, ny, fewer_locks(locks))
-		} else if c == TILE_MONSTER {
+		} else if c == TILE_MERCHANT {
+			g.phase = .Shop
+			g.note = "Welcome, adventurer."
+		} else if is_monster(c) {
 			if g.as > 0 {
 				play(g, .Sword_Kill)
 				say(g, "Monster slain", 5)
@@ -491,18 +540,140 @@ move :: proc(g: ^Game, dx, dy: int) {
 		mset(g, nx, ny, 0)
 		g.lantern = true
 		g.fuel = min(g.fuel + LANTERN_FUEL, FUEL_MAX)
-	case TILE_TRAP:
-		mset(g, nx, ny, TRAP_SPRUNG)
-		g.h -= 1
-		if g.h <= 0 {
-			play(g, .Music_Death)
-			say(g, "You died!", 3)
+	case TILE_KIT:
+		play(g, .Key)
+		say(g, "+1 disarm kit", 12)
+		mset(g, nx, ny, 0)
+		g.ts += 1
+	case TILE_TRAP_SEEN:
+		if g.ts > 0 {
+			g.ts -= 1
+			play(g, .Door)
+			say(g, "Trap disarmed", 4)
+			mset(g, nx, ny, 0)
 		} else {
-			play(g, .Trap)
-			say(g, "Trap! -1 health", 3)
+			spring(g, nx, ny)
 		}
+	case TILE_TRAP:
+		spring(g, nx, ny)
+	}
+	if g.phase == .Play && alive(g) && g.level == level {
+		wander(g)
 	}
 	see(g)
+}
+
+// A trap goes off under the player.
+@(private)
+spring :: proc(g: ^Game, nx, ny: int) {
+	mset(g, nx, ny, TRAP_SPRUNG)
+	g.h -= 1
+	if g.h <= 0 {
+		play(g, .Music_Death)
+		say(g, "You died!", 3)
+	} else {
+		play(g, .Trap)
+		say(g, "Trap! -1 health", 3)
+	}
+}
+
+// A small linear congruential generator, seeded in init_game, so play is repeatable.
+@(private)
+rand :: proc(g: ^Game, n: int) -> int {
+	g.rng = g.rng * 1664525 + 1013904223
+	return int(g.rng >> 16) % n
+}
+
+@(private)
+step_free :: proc(g: ^Game, x, y: int) -> bool {
+	return mget(g, x, y) == 0 && (x != g.x || y != g.y) && x >= 0 && y >= 0 && x < g.mw && y < g.mh
+}
+
+// After each step the wraiths act: one beside you strikes, one that sees you closes in (but
+// rests every third step, so it can be outrun), and the rest drift about.
+@(private)
+wander :: proc(g: ^Game) {
+	g.turns += 1
+	cells: [32][2]int
+	n := 0
+	for y in 0 ..< g.mh {
+		for x in 0 ..< g.mw {
+			if g.map_[y * g.mw + x] == TILE_WRAITH && n < len(cells) {
+				cells[n] = {x, y}
+				n += 1
+			}
+		}
+	}
+	for c in cells[:n] {
+		x, y := c[0], c[1]
+		dx, dy := g.x - x, g.y - y
+		if abs(dx) + abs(dy) == 1 {
+			monster_hits(g, "Wraith strikes!")
+			if !alive(g) {
+				return
+			}
+			continue
+		}
+		if g.turns % 3 == 0 {
+			continue
+		}
+		sx, sy := 0, 0
+		if abs(dx) + abs(dy) <= CHASE_RANGE && clear_line(g, x, y, g.x, g.y) {
+			ax, ay := dx > 0 ? 1 : -1, dy > 0 ? 1 : -1
+			if abs(dx) >= abs(dy) {
+				if step_free(g, x + ax, y) && dx != 0 {
+					sx = ax
+				} else if dy != 0 && step_free(g, x, y + ay) {
+					sy = ay
+				}
+			} else {
+				if step_free(g, x, y + ay) && dy != 0 {
+					sy = ay
+				} else if dx != 0 && step_free(g, x + ax, y) {
+					sx = ax
+				}
+			}
+		} else if rand(g, 2) == 0 {
+			d := rand(g, 4)
+			sx, sy = d == 0 ? 1 : d == 1 ? -1 : 0, d == 2 ? 1 : d == 3 ? -1 : 0
+		}
+		if (sx != 0 || sy != 0) && step_free(g, x + sx, y + sy) {
+			mset(g, x, y, 0)
+			mset(g, x + sx, y + sy, TILE_WRAITH)
+		}
+	}
+}
+
+SHOP_ITEMS :: 6
+SHOP_NAMES := [SHOP_ITEMS]string{"Potion", "Shield", "Sword", "Disarm kit", "Light +60", "Trap amulet"}
+SHOP_PRICES := [SHOP_ITEMS]int{3, 2, 2, 1, 1, 2}
+
+// Buys item n (0-based) from the merchant, if the player has the jools.
+@(private)
+buy :: proc(g: ^Game, n: int) {
+	if n == 5 && g.sense {
+		g.note = "You already wear one."
+		return
+	}
+	if g.js < SHOP_PRICES[n] {
+		play(g, .Bump)
+		g.note = "Not enough jools."
+		return
+	}
+	g.js -= SHOP_PRICES[n]
+	play(g, .Key)
+	g.note = "A pleasure."
+	switch n {
+	case 0: g.ps += 1
+	case 1: g.ds += 1
+	case 2: g.as += 1
+	case 3: g.ts += 1
+	case 4: g.fuel = min(g.fuel + TORCH_FUEL, FUEL_MAX)
+	case 5:
+		g.sense = true
+		spot_traps(g)
+		see(g)
+	}
 }
 
 // Qf: quaffing always sets health to 3, even from full.
@@ -554,6 +725,17 @@ command :: proc(g: ^Game, cmd: Command) {
 			move(g, 1, 0)
 		case .Quaff:
 			quaff(g)
+		}
+	case .Shop:
+		#partial switch cmd {
+		case .Choose_1: buy(g, 0)
+		case .Choose_2: buy(g, 1)
+		case .Choose_3: buy(g, 2)
+		case .Choose_4: buy(g, 3)
+		case .Choose_5: buy(g, 4)
+		case .Choose_6: buy(g, 5)
+		case:
+			g.phase = .Play
 		}
 	case .Score:
 	}

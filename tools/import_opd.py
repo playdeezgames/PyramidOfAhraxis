@@ -21,6 +21,7 @@ FLOOR, WALL, DOOR, GATE1, GATE2, GATE3 = 0, 1, 2, 3, 4, 5
 EXIT, TRAP, MONSTER = 8, 9, 66
 KEY, POTION, JOOL, SHIELD, SWORD = 128, 129, 130, 131, 132
 BRAZIER, TORCH, LANTERN = 6, 133, 134
+MERCHANT, WRAITH, KIT = 7, 67, 135
 GATES = {1: GATE1, 2: GATE2, 3: GATE3}
 LOCK_TILES = {DOOR, GATE1, GATE2, GATE3}
 
@@ -29,17 +30,17 @@ LOCK_TILES = {DOOR, GATE1, GATE2, GATE3}
 # away from it, so a guard is a toll on every key). `side` = extra locked doors on dead-end rooms (each costs one more key and
 # guards a few rewards); keys placed = locks + side.
 LEVELS = [
-    dict(file='101_small.json', locks=1, side=0, potions=1, jools=2, swords=1, monsters=1, guards=1, shields=0, traps=0,
+    dict(file='101_small.json', locks=1, side=0, potions=1, jools=2, swords=1, monsters=2, guards=1, shields=0, traps=1, wraiths=0, ctraps=0, kits=1,
          torches=0, lanterns=0, braziers=1, fuel=250, theme=0),
-    dict(file='202_medium.json', locks=2, side=0, potions=1, jools=2, swords=2, monsters=3, guards=2, shields=1, traps=1,
+    dict(file='202_medium.json', locks=2, side=0, potions=1, jools=2, swords=2, monsters=4, guards=2, shields=1, traps=5, wraiths=1, ctraps=0, kits=1,
          torches=1, lanterns=0, braziers=1, fuel=220, theme=1),
-    dict(file='201_medium.json', locks=1, side=1, potions=2, jools=4, swords=3, monsters=5, guards=2, shields=2, traps=3,
+    dict(file='201_medium.json', locks=1, side=1, potions=2, jools=4, swords=3, monsters=7, guards=2, shields=2, traps=9, wraiths=2, ctraps=1, kits=2,
          torches=2, lanterns=0, braziers=2, fuel=300, theme=2),
-    dict(file='1653868650_default.json', locks=1, side=1, potions=3, jools=4, swords=4, monsters=6, guards=2, shields=2, traps=3,
+    dict(file='1653868650_default.json', locks=1, side=1, potions=3, jools=4, swords=4, monsters=9, guards=2, shields=2, traps=10, wraiths=3, ctraps=1, kits=2,
          torches=2, lanterns=1, braziers=2, fuel=300, theme=3),
-    dict(file='302_large.json', locks=1, side=1, potions=3, jools=5, swords=4, monsters=7, guards=1, shields=3, traps=4,
+    dict(file='302_large.json', locks=1, side=1, potions=3, jools=5, swords=4, monsters=11, guards=1, shields=3, traps=14, wraiths=4, ctraps=2, kits=3,
          torches=3, lanterns=1, braziers=2, fuel=350, theme=4),
-    dict(file='203_medium.json', locks=3, side=1, potions=4, jools=6, swords=6, monsters=9, guards=4, shields=4, traps=5,
+    dict(file='203_medium.json', locks=3, side=1, potions=4, jools=6, swords=6, monsters=13, guards=4, shields=4, traps=18, wraiths=5, ctraps=2, kits=4,
          torches=3, lanterns=1, braziers=3, fuel=400, theme=5),
 ]
 
@@ -259,24 +260,33 @@ def build(cfg, attempt):
     scatter(cfg['lanterns'], LANTERN)
     scatter(cfg['braziers'], BRAZIER)
     scatter(cfg['monsters'] - guarded, MONSTER, extra=far_start)
+    far8 = lambda c: abs(c[0] - start[0]) + abs(c[1] - start[1]) >= 8
+    scatter(cfg['wraiths'], WRAITH, extra=far8)
     scatter(cfg['traps'], TRAP, extra=far_start)
+    # The merchant and the disarm kits go before the gate; corridor traps cannot be walked around.
+    before = [c for i in sorted(region_a_comps) if i not in side_rooms for c in spots(i)]
+    scatter(1, MERCHANT, before)
+    scatter(cfg['kits'], KIT, before)
+    corridor = [c for c in sorted(floor) if c not in room_of and c not in door_cells and not near_door(c)
+                and abs(c[0] - start[0]) + abs(c[1] - start[1]) >= 4 and c != exit_cell and not near_exit(c)]
+    scatter(cfg['ctraps'], TRAP, corridor)
     tiles[exit_cell] = EXIT
     used.add(exit_cell)
 
     # Solvability: keys reachable with locks and monsters in the way, then everything
     # reachable with the locks open.
-    blocked = lambda c: tiles.get(c) in LOCK_TILES or tiles.get(c) in (MONSTER, BRAZIER)
+    blocked = lambda c: tiles.get(c) in LOCK_TILES or tiles.get(c) in (MONSTER, WRAITH, BRAZIER, MERCHANT)
     reach0, _ = flood(start, lambda c: c in tiles and not blocked(c))
     keys = [c for c, t in tiles.items() if t == KEY]
     total_locks = sum({DOOR: 1, GATE1: 1, GATE2: 2, GATE3: 3}[t] for t in tiles.values() if t in LOCK_TILES)
     assert len(keys) == total_locks, (cfg['file'], len(keys), total_locks)
     if not all(k in reach0 for k in keys):
         raise ValueError('key not reachable')
-    reach1, _ = flood(start, lambda c: c in tiles and tiles[c] not in (MONSTER, BRAZIER))
-    if any(c not in reach1 for c, t in tiles.items() if t in (KEY, POTION, JOOL, SHIELD, SWORD, EXIT, TORCH, LANTERN)):
+    reach1, _ = flood(start, lambda c: c in tiles and tiles[c] not in (MONSTER, WRAITH, BRAZIER, MERCHANT))
+    if any(c not in reach1 for c, t in tiles.items() if t in (KEY, POTION, JOOL, SHIELD, SWORD, EXIT, TORCH, LANTERN, KIT)):
         raise ValueError('something not reachable with the locks open')
     # Monsters must never be needed to get through.
-    reach2, _ = flood(start, lambda c: c in tiles and tiles[c] not in (MONSTER, BRAZIER, WALL))
+    reach2, _ = flood(start, lambda c: c in tiles and tiles[c] not in (MONSTER, WRAITH, BRAZIER, MERCHANT, WALL))
     assert exit_cell in reach2
 
     hint = hint_of(notes) if gate_note else 'A locked gate bars the way to the exit.'

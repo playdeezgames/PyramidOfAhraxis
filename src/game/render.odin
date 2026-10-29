@@ -53,6 +53,9 @@ Gfx :: enum {
 	Candle,
 	Lantern,
 	Brazier,
+	Merchant,
+	Wraith,
+	Kit,
 }
 
 // How a level looks: its wall picture and colour, and what its floor is made of.
@@ -87,9 +90,13 @@ tile_gfx :: proc(id: int) -> (g: Gfx, ok: bool) {
 	case 6: return .Brazier, true
 	case 133: return .Candle, true
 	case 134: return .Lantern, true
+	case 7: return .Merchant, true
 	case 8: return .Exit, true
 	case 41: return .Trap, true
+	case 10: return .Trap, true
 	case 66: return .Monster, true
+	case 67: return .Wraith, true
+	case 135: return .Kit, true
 	case 128: return .Key, true
 	case 129: return .Potion, true
 	case 130: return .Jool, true
@@ -158,7 +165,7 @@ draw_map :: proc(f: ^Frame, g: ^Game, cx, cy: int) {
 			}
 			t := mget(g, mx, my)
 			if remembered {
-				if t == TILE_MONSTER {
+				if is_monster(t) {
 					continue
 				}
 				if gfx, ok := tile_gfx(int(t)); ok {
@@ -172,7 +179,11 @@ draw_map :: proc(f: ^Frame, g: ^Game, cx, cy: int) {
 			if t == 1 {
 				draw_gfx_color(f, theme.wall, x, y, theme.wall_color)
 			} else if gfx, ok := tile_gfx(int(t)); ok {
-				draw_gfx(f, gfx, x, y)
+				if t == TILE_TRAP_SEEN {
+					draw_gfx_color(f, gfx, x, y, 4)
+				} else {
+					draw_gfx(f, gfx, x, y)
+				}
 			}
 			if n := locks_of(t); n > 1 { // a gate that takes several keys shows how many
 				digit := [1]u8{u8('0' + n)}
@@ -353,13 +364,29 @@ draw_play :: proc(f: ^Frame, g: ^Game) {
 	hud_row(f, .Sword, g.as, 4)
 	hud_row(f, .Shield, g.ds, 5)
 	hud_row(f, g.lantern ? .Lantern : .Candle, g.fuel, 6, g.fuel == 0 ? 3 : g.fuel <= 30 ? 4 : 12)
+	hud_row(f, .Kit, g.ts, 7)
 	a, b: [12]u8
 	at := num_text(a[:], "Lv ", g.level + 1)
-	shadow(f, at, HUD_X, 97, 13)
-	shadow(f, num_text(b[:], "/", len(LEVELS)), HUD_X + text_width(at), 97, 13)
-	shadow(f, "Move:\x18\x19\x1B\x1A", HUD_X, 107)
-	shadow(f, "P:Potion", HUD_X, 115)
-	shadow(f, "F2:Reset", HUD_X, 123)
+	shadow(f, at, HUD_X, 113, 13)
+	shadow(f, num_text(b[:], "/", len(LEVELS)), HUD_X + text_width(at), 113, 13)
+	shadow(f, "P:Potion", HUD_X, 123)
+}
+
+draw_shop :: proc(f: ^Frame, g: ^Game) {
+	cls(f, COLOR_BG)
+	draw_gfx(f, .Merchant, 0, 2)
+	shadow(f, "Merchant", 16, 0, 4, 0, 2)
+	buf: [24]u8
+	shadow(f, num_text(buf[:], "Jools x ", g.js), 0, 20, 11)
+	for name, i in SHOP_NAMES {
+		y := 34 + i * 12
+		digit := [1]u8{u8('1' + i)}
+		shadow(f, string(digit[:]), 0, y, 4)
+		shadow(f, name, 14, y)
+		shadow(f, num_text(buf[:], "", SHOP_PRICES[i]), 130, y, 11)
+	}
+	shadow(f, g.note, 0, 108, 13)
+	shadow(f, "1-6: Buy   Any other key: Leave", 0, 124, 14)
 }
 
 draw_score :: proc(f: ^Frame, g: ^Game) {
@@ -384,6 +411,8 @@ draw_game :: proc(f: ^Frame, g: ^Game) {
 		draw_help(f)
 	case .Play:
 		draw_play(f, g)
+	case .Shop:
+		draw_shop(f, g)
 	case .Score:
 		draw_score(f, g)
 	}

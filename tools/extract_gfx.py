@@ -41,6 +41,9 @@ PICKS = [
     ('Candle',     30, 22, 12),  # a torch pickup
     ('Lantern',    26, 22, 4),
     ('Brazier',    28, 22, 3),   # a fixed light, solid
+    ('Merchant',  106, 0, 4),    # the jool shop
+    ('Wraith',    104, 7, 11),   # a hunter
+    ('Kit',        29, 25, 12),  # disarm kit
 ]
 
 def tile(col, row, color):

@@ -688,3 +688,84 @@ last_heart_blinks :: proc(t: ^testing.T) {
 	g.floats = {}
 	testing.expect(t, !tick(&g), "two hearts do not blink")
 }
+
+@(test)
+bumping_a_merchant_opens_the_shop :: proc(t: ^testing.T) {
+	g := in_the_open(100)
+	put_right(&g, TILE_MERCHANT)
+	command(&g, .Right)
+	testing.expect_value(t, g.phase, Phase.Shop)
+	g.js = 3
+	command(&g, .Choose_4) // disarm kit, 1 jool
+	testing.expect_value(t, g.ts, 1)
+	testing.expect_value(t, g.js, 2)
+	command(&g, .Choose_1) // potion, 3 jools: too dear
+	testing.expect_value(t, g.ps, 0)
+	testing.expect_value(t, g.js, 2)
+	command(&g, .Up) // any other key leaves
+	testing.expect_value(t, g.phase, Phase.Play)
+	testing.expect_value(t, g.x, 21) // the merchant did not move us
+}
+
+@(test)
+amulet_is_bought_once :: proc(t: ^testing.T) {
+	g := in_the_open(100)
+	g.phase, g.js = .Shop, 10
+	command(&g, .Choose_6)
+	command(&g, .Choose_6)
+	testing.expect(t, g.sense)
+	testing.expect_value(t, g.js, 8)
+}
+
+@(test)
+amulet_reveals_traps_and_a_kit_disarms_them :: proc(t: ^testing.T) {
+	g := in_the_open(100)
+	mset(&g, g.x + 2, g.y, TILE_TRAP)
+	command(&g, .Left) // nothing felt without the amulet
+	command(&g, .Right)
+	testing.expect_value(t, mget(&g, g.x + 2, g.y), u8(TILE_TRAP))
+	g.sense = true
+	see(&g)
+	testing.expect_value(t, mget(&g, g.x + 2, g.y), u8(TILE_TRAP_SEEN))
+	g.ts = 1
+	command(&g, .Right)
+	command(&g, .Right) // onto the spotted trap
+	testing.expect_value(t, g.h, 3)
+	testing.expect_value(t, g.ts, 0)
+	testing.expect_value(t, mget(&g, g.x, g.y), u8(0))
+}
+
+@(test)
+a_spotted_trap_still_hurts_without_a_kit :: proc(t: ^testing.T) {
+	g := in_the_open(100)
+	mset(&g, g.x + 1, g.y, TILE_TRAP_SEEN)
+	command(&g, .Right)
+	testing.expect_value(t, g.h, 2)
+}
+
+@(test)
+wraith_closes_in_then_strikes :: proc(t: ^testing.T) {
+	g := in_the_open(100)
+	mset(&g, g.x + 5, g.y, TILE_WRAITH)
+	g.turns = 0
+	command(&g, .Left) // turns = 1: the wraith moves
+	command(&g, .Right) // turns = 2: moves again, now two cells away
+	testing.expect_value(t, mget(&g, g.x + 3, g.y), u8(TILE_WRAITH)) // five cells away, two steps closer
+	command(&g, .Up) // turns = 3: it rests
+	testing.expect_value(t, mget(&g, g.x + 3, g.y - 0), u8(0)) // we moved up, so it is no longer on our row
+	for _ in 0 ..< 8 { // pace; a hunter that catches up lands blows
+		command(&g, .Down)
+		command(&g, .Up)
+	}
+	testing.expect(t, g.h < 3, "a hunting wraith lands blows")
+}
+
+@(test)
+wraith_can_be_slain_with_a_sword :: proc(t: ^testing.T) {
+	g := in_the_open(100)
+	put_right(&g, TILE_WRAITH)
+	g.as = 1
+	command(&g, .Right)
+	testing.expect_value(t, g.ms, 1)
+	testing.expect_value(t, mget(&g, g.x + 1, g.y), u8(0))
+}
