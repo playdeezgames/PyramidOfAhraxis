@@ -1,6 +1,6 @@
 # Pyramid of Ahraxis
 
-Walk the tomb one step at a time: find **keys** to open doors, **potions** to heal, **shields** to turn a monster's blow aside, **swords** to kill monsters and **jools** for the score. Some floor tiles are traps. Seven levels (a tutorial, five dungeons from One Page Dungeon seeds, then the original map): reach each exit to go on, and the last one shows how you did. Gates can take several keys, monsters strike when you step away from them, and you carry a light that burns down as you walk: torches and lanterns are the clock, and the dark bites. Each dungeon has its own look.
+Walk the tomb one step at a time: find **keys** to open doors, **potions** to heal, **shields** to turn a monster's blow aside, **swords** to kill monsters and **jools** for the score. Many floor tiles are hidden traps (a trap amulet and disarm kits help), wraiths hunt you, and jools are money for the merchant on each level. Seven levels (a tutorial, five dungeons from One Page Dungeon seeds, then the original map): reach each exit to go on, and the last one shows how you did. Gates can take several keys, monsters strike when you step away from them, and you carry a light that burns down as you walk: torches and lanterns are the clock, and the dark bites. Each dungeon has its own look.
 
 **Play it:** https://playdeezgames.github.io/PyramidOfAhraxis/ (also on itch.io: https://thegrumpygamedev.itch.io/pyramid-of-ahraxis)
 

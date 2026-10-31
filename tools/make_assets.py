@@ -10,7 +10,7 @@ shots = os.path.join(ROOT, 'assets/screenshots')
 os.makedirs(shots, exist_ok=True)
 for old in os.listdir(shots):
     os.remove(os.path.join(shots, old))
-for i, n in enumerate(['menu', 'banner', 'play', 'help', 'score'], 1):
+for i, n in enumerate(['menu', 'banner', 'play', 'shop', 'help', 'rules', 'score'], 1):
     frame(n).resize((960, 544), Image.NEAREST).save(os.path.join(ROOT, f'assets/screenshots/0{i}-{n}.png'))
 # Cover: the title screen at 2x over a strip of the dungeon at 2x, integer scaling only.
 cover = Image.new('RGB', (630, 500), (26, 28, 44))
